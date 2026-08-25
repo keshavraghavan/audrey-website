@@ -899,7 +899,14 @@ Replace the album-preview tile grid (was `PhotoSlot` per fixed id):
 </div>
 ```
 
-In `components/tabs/GuestbookTab.tsx`: change the `messages` prop type to `MessageWithPhotos[]` (import from `@/lib/db/queries`), remove the `MessageTint`/`tintStyle` import from `@/lib/audrey-data` and instead import `tintForIndex, swatchForIndex, formatMeta` and the `MessageTint` type from `@/lib/message-style`. Update the mapping to compute per-index styling and drop the old `photos`-boolean-driven hardcoded `PhotoSlot`s in favor of `m.photoUrls`:
+In `components/tabs/GuestbookTab.tsx`: change the `messages` prop type to `MessageWithPhotos[]`, remove the `MessageTint` import from `@/lib/audrey-data`, and import from the new modules instead:
+
+```tsx
+import type { MessageWithPhotos } from "@/lib/db/queries";
+import { formatMeta, swatchForIndex, tintForIndex, type MessageTint } from "@/lib/message-style";
+```
+
+Update the mapping to compute per-index styling and drop the old `photos`-boolean-driven hardcoded `PhotoSlot`s in favor of `m.photoUrls`:
 
 ```tsx
 {messages.map((m, i) => {
@@ -1164,14 +1171,13 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 
 - [ ] **Step 1: Add `setMessageLike` to `app/actions.ts`**
 
-Add these imports to the top of the file:
+Add a new import line to the top of the file — there is no existing `drizzle-orm` import yet at this point, so this is a fresh line, not a merge into anything:
 
 ```ts
 import { eq, sql } from "drizzle-orm";
-import { guestbookMessages } from "@/lib/db/schema";
 ```
 
-(`guestbookMessages` is already imported — just add `eq, sql` to the existing `drizzle-orm` import line.)
+(`guestbookMessages` from `@/lib/db/schema` is already imported by Task 5 — leave that line as-is.)
 
 Append:
 
