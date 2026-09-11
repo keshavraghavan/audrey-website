@@ -401,15 +401,15 @@ export function formatMeta(relation: string | null, createdAt: Date): string {
 
 - [ ] **Step 5: Trim `lib/audrey-data.ts` to just the static content**
 
-Remove `GuestbookMessage`, `MessageTint`, `SEED_MESSAGES`, `Track`, `SEED_PLAYLIST`, `AlbumPhoto`, `ALBUM` — all of it is now either DB-backed (`lib/db/schema.ts`) or replaced by `lib/message-style.ts`. Keep everything else (`TABS`, `Tab`, `Book`, `SHELF`, `Artist`, `ARTISTS`, `SONG_PALETTES`, `BAR_HEIGHTS`, `BAR_COLORS`, site constants).
+Remove `GuestbookMessage`, `MessageTint`, `SEED_MESSAGES`, `Track`, `SEED_PLAYLIST`, `AlbumPhoto`, `ALBUM` — all of it is now either DB-backed (`lib/db/schema.ts`) or replaced by `lib/message-style.ts`. Keep everything else (`TABS`, `Tab`, `Artist`, `ARTISTS`, `SONG_PALETTES`, `BAR_HEIGHTS`, `BAR_COLORS`, site constants).
 
-Read the current file and remove exactly those blocks — the result should still export `Tab`, `TABS`, `Book`, `SHELF`, `Artist`, `ARTISTS`, `SONG_PALETTES`, `BAR_HEIGHTS`, `BAR_COLORS`, `NAME`, `AGE`, `ACCENT`, `BIRTHDAY`, `BOOKS_READ`, `FIVE_STAR_COUNT`, `BOOKS_TO_GOAL`, `READING_GOAL`. Update the file's top comment (currently describes the localStorage behavior being removed) to:
+Read the current file and remove exactly those blocks — the result should still export `Tab`, `TABS`, `Artist`, `ARTISTS`, `SONG_PALETTES`, `BAR_HEIGHTS`, `BAR_COLORS`, `NAME`, `AGE`, `ACCENT`, `BIRTHDAY`. Update the file's top comment (currently describes the localStorage behavior being removed) to:
 
 ```ts
-// Static content for the AudreyWare 24.0 birthday site — books and top
-// artists are curated flavor content, not visitor input, so they stay
-// hardcoded here. Guestbook messages, the playlist, and album photos are
-// real data now; see lib/db/schema.ts and lib/db/queries.ts.
+// Static content for the AudreyWare 24.0 birthday site — top artists are
+// curated flavor content, not visitor input, so they stay hardcoded here.
+// Guestbook messages, the playlist, and album photos are real data now; see
+// lib/db/schema.ts and lib/db/queries.ts.
 ```
 
 - [ ] **Step 6: Make `app/page.tsx` an async Server Component that fetches real data**
@@ -451,7 +451,6 @@ Replace the whole file. This drops `SEED_MESSAGES`/`SEED_PLAYLIST` imports and t
 
 import { useCallback, useEffect, useState } from "react";
 import HomeTab from "@/components/tabs/HomeTab";
-import ShelfTab from "@/components/tabs/ShelfTab";
 import SoundsTab from "@/components/tabs/SoundsTab";
 import PhotosTab from "@/components/tabs/PhotosTab";
 import GuestbookTab from "@/components/tabs/GuestbookTab";
@@ -461,7 +460,7 @@ import type { MessageWithPhotos } from "@/lib/db/queries";
 
 const LIKED_STORAGE_KEY = "audreyware24:liked";
 const MARQUEE_TEXT =
-  "✿ sign the guestbook ✿ add a song to her playlist ✿ 41 books this year ✿ drop a photo in the album ✿ tell us your first memory of her ✿ ";
+  "✿ sign the guestbook ✿ add a song to her playlist ✿ drop a photo in the album ✿ tell us your first memory of her ✿ ";
 
 export default function AudreySite({
   initialMessages,
@@ -753,14 +752,12 @@ export default function AudreySite({
 
           {tab === "home" && (
             <HomeTab
-              recentMessages={messages.slice(0, 2)}
-              messageCount={messages.length}
+              messages={messages}
               albumPhotos={albumPhotos}
               onGoGuestbook={() => goTo("guestbook")}
               onGoPhotos={() => goTo("photos")}
             />
           )}
-          {tab === "shelf" && <ShelfTab />}
           {tab === "sounds" && (
             <SoundsTab
               playlist={playlist}
@@ -816,22 +813,16 @@ Note: `postMessage`/`addSong` are intentionally left as stubs that only handle t
 
 - [ ] **Step 8: Update `HomeTab`, `GuestbookTab`, `SoundsTab`, `PhotosTab` to accept real data shapes**
 
-In `components/tabs/HomeTab.tsx`: change the props type to take `recentMessages: MessageWithPhotos[]` (import from `@/lib/db/queries`) and `albumPhotos: AlbumPhotoRow[]` (import from `@/lib/db/schema`) instead of `GuestbookMessage[]`/derived `ALBUM`. Replace the `photoTiles` derivation and rendering:
+In `components/tabs/HomeTab.tsx`: change the props type to take `messages: MessageWithPhotos[]` (import from `@/lib/db/queries`) and `albumPhotos: AlbumPhotoRow[]` (import from `@/lib/db/schema`) instead of `GuestbookMessage[]`/derived `ALBUM`. Replace the `photoTiles` derivation and rendering:
 
 ```tsx
 import type { AlbumPhotoRow } from "@/lib/db/schema";
 import type { MessageWithPhotos } from "@/lib/db/queries";
 import { formatMeta, swatchForIndex } from "@/lib/message-style";
-import {
-  BAR_COLORS,
-  BAR_HEIGHTS,
-  BOOKS_READ,
-  BOOKS_TO_GOAL,
-  FIVE_STAR_COUNT,
-} from "@/lib/audrey-data";
+import { BAR_COLORS, BAR_HEIGHTS } from "@/lib/audrey-data";
 ```
 
-Remove the `PhotoSlot` import and the `ALBUM` import. Replace the `HomeTab` props type's `recentMessages: GuestbookMessage[]` with `recentMessages: MessageWithPhotos[]` and add `albumPhotos: AlbumPhotoRow[]`. Replace:
+Remove the `PhotoSlot` import and the `ALBUM` import. Replace the `HomeTab` props type's `messages: GuestbookMessage[]` with `messages: MessageWithPhotos[]` and add `albumPhotos: AlbumPhotoRow[]`. Replace:
 
 ```tsx
 const photoTiles = ALBUM.slice(0, 4);
@@ -843,29 +834,34 @@ with:
 const photoTiles = albumPhotos.slice(0, 4);
 ```
 
-Replace the message-rendering block's avatar swatch and meta text — `m.swatch` and `m.meta` no longer exist on the row type:
+Update `MessageCard` — `message.swatch` and `message.meta` no longer exist on the row type. It takes the message's position in `messages` as an `index` prop, so avatar colors don't depend on whether a card is pinned or in the fill area:
 
 ```tsx
-{recentMessages.map((m, i) => (
-  <div
-    key={m.id}
-    style={{
-      borderRadius: 12,
-      background: "linear-gradient(#fdf7f9, #f6e8ef)",
-      boxShadow: "0 3px 0 #f4d3e3, 0 8px 18px rgba(163,0,94,0.08)",
-      padding: "16px 18px",
-    }}
-  >
-    <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-      <div style={{ width: 28, height: 28, borderRadius: "50%", background: swatchForIndex(i), flex: "none" }} />
-      <div style={{ fontSize: 12, fontWeight: 700, color: "#7a0048" }}>
-        {m.name} <span style={{ fontWeight: 400, color: "#8a5875" }}>{formatMeta(m.relation, m.createdAt)}</span>
-      </div>
-    </div>
-    <p style={{ margin: "9px 0 0", fontSize: 14, lineHeight: 1.75, color: "#4a3341", textWrap: "pretty" }}>
-      {m.body}
-    </p>
+function MessageCard({ message, index, style }: { message: MessageWithPhotos; index: number; style?: CSSProperties }) {
+```
+
+with its header becoming:
+
+```tsx
+<div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+  <div style={{ width: 28, height: 28, borderRadius: "50%", background: swatchForIndex(index), flex: "none" }} />
+  <div style={{ fontSize: 12, fontWeight: 700, color: "#7a0048" }}>
+    {message.name} <span style={{ fontWeight: 400, color: "#8a5875" }}>{formatMeta(message.relation, message.createdAt)}</span>
   </div>
+</div>
+```
+
+and both lists passing it:
+
+```tsx
+{messages.slice(0, PINNED_MESSAGES).map((m, i) => (
+  <MessageCard key={m.id} message={m} index={i} />
+))}
+```
+
+```tsx
+{messages.slice(PINNED_MESSAGES).map((m, i) => (
+  <MessageCard key={m.id} message={m} index={PINNED_MESSAGES + i} style={{ width: "100%", marginTop: 10 }} />
 ))}
 ```
 
@@ -1032,7 +1028,7 @@ export default function PhotosTab({ photos }: { photos: AlbumPhotoRow[]; onPhoto
 npm run dev
 ```
 
-Visit `http://localhost:3000`. Expected: page loads with no server-side errors in the terminal; Home tab shows "0" messages and "No photos yet"; Guestbook tab shows "0 messages"; Sounds tab shows "0 songs" in "THE BIRTHDAY MIX"; Photos tab shows an empty grid. `ShelfTab` (untouched) still renders the static book list.
+Visit `http://localhost:3000`. Expected: page loads with no server-side errors in the terminal; Home tab shows "0" messages and "No photos yet"; Guestbook tab shows "0 messages"; Sounds tab shows "0 songs" in "THE BIRTHDAY MIX"; Photos tab shows an empty grid.
 
 - [ ] **Step 10: Commit**
 

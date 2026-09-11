@@ -9,8 +9,8 @@ The site (`AudreySite.tsx` and its tabs) is currently a fully client-side mock:
 guestbook messages, the playlist, and dropped photos are held in React state
 and persisted to `localStorage`, which means nothing is shared between
 visitors — every guest sees their own private copy of the guestbook. "Her
-shelf" (books) and "her sounds" (top artists) are flavor content curated by
-the site's builders, not visitor input.
+sounds" (top artists) is flavor content curated by the site's builders, not
+visitor input.
 
 This design replaces the `localStorage` persistence with real shared
 storage, so that a guestbook message, playlist addition, or uploaded photo
@@ -22,8 +22,8 @@ no-login link before Audrey's birthday (Sep 20, 2026).
 
 - **Album** becomes an open-ended gallery (every upload adds a new shared
   photo) rather than the current 7 fixed per-device slots.
-- **Shelf** (books) and **sounds** (top artists) stay hardcoded static
-  content — not moved into the database.
+- **Sounds** (top artists) stays hardcoded static content — not moved into
+  the database.
 - **Moderation**: a passcode-gated `/admin` view with delete buttons.
   No rate limiting, no per-visitor accounts.
 - **Guestbook photos**: the existing inert "+ ADD PHOTOS (3 MAX)" button
@@ -138,7 +138,7 @@ Notes:
 | `components/tabs/GuestbookTab.tsx` | "+ ADD PHOTOS (3 MAX)" becomes a working `PhotoUploader` (multi, capped at 3) attached to the in-progress message. |
 | `components/tabs/HomeTab.tsx` | Home preview tiles read from the same album photo list (first 4), instead of the old fixed `album-0..3` slot ids. |
 | `app/admin/page.tsx` | New. Passcode form; once authenticated, lists messages/songs/photos with delete buttons. |
-| `lib/audrey-data.ts` | `SEED_MESSAGES`, `SEED_PLAYLIST`, `ALBUM`, `GuestbookMessage`/`Track`/`AlbumPhoto` types are removed or trimmed to just the types/static content that remain (`SHELF`, `ARTISTS`, `SONG_PALETTES`, site constants). |
+| `lib/audrey-data.ts` | `SEED_MESSAGES`, `SEED_PLAYLIST`, `ALBUM`, `GuestbookMessage`/`Track`/`AlbumPhoto` types are removed or trimmed to just the types/static content that remain (`ARTISTS`, `SONG_PALETTES`, site constants). |
 
 ## Data flow examples
 
@@ -223,6 +223,6 @@ validation logic are a possible follow-up, not part of this pass.
 
 - Rate limiting / per-IP throttling (explicitly declined during
   brainstorming — admin delete is the only moderation tool).
-- Moving `SHELF` / `ARTISTS` static content into the database.
+- Moving `ARTISTS` static content into the database.
 - Real user accounts/auth (single shared admin passcode only).
 - Migrating the current mock seed content into the new tables.
