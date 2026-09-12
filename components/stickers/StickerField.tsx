@@ -1,12 +1,18 @@
 // components/stickers/StickerField.tsx
 "use client";
 
+import { useRef } from "react";
 import { STICKERS } from "@/lib/stickers/registry";
 import { CheckerPattern } from "@/lib/stickers/shared-defs";
+import { useStickerDrag } from "@/hooks/useStickerDrag";
 
 export default function StickerField() {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { bind } = useStickerDrag(containerRef);
+
   return (
     <div
+      ref={containerRef}
       aria-hidden="true"
       style={{
         position: "absolute",
@@ -52,6 +58,7 @@ export default function StickerField() {
         <div
           key={s.id}
           data-sticker={s.id}
+          {...bind(s.id, s.home.x, s.home.y, s.size)}
           style={{
             position: "absolute",
             left: `${s.home.x}%`,
@@ -62,6 +69,7 @@ export default function StickerField() {
             marginTop: -s.size / 2,
             zIndex: s.layer,
             pointerEvents: "auto",
+            touchAction: "none",
           }}
         >
           <div data-drift style={{ width: "100%", height: "100%" }}>
