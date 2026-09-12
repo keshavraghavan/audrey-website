@@ -670,6 +670,16 @@ import StickerField from "@/components/stickers/StickerField";
                 // tie in the sheen's favor, restoring it above the checker
                 // and still below the title wrapper's zIndex: 2.
                 zIndex: 1,
+                // Tying the sheen's z-index with StickerField's also ties
+                // their hit-test order the same way (the browser hit-tests
+                // in reverse paint order — whatever paints last, on top,
+                // is also hit first) — so without this, the sheen (now on
+                // top) would silently swallow pointer events meant for any
+                // sticker underneath it in this top-half band, once Task 4
+                // wires up drag handlers. `pointerEvents: "none"` keeps the
+                // sheen purely visual, matching the pattern StickerField's
+                // own root already uses for the same reason.
+                pointerEvents: "none",
               }}
             />
 ```
