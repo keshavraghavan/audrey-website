@@ -50,6 +50,16 @@ export function useStickerDrag(containerRef: React.RefObject<HTMLElement | null>
     homeXPct: number;
     homeYPct: number;
   } | null>(null);
+  // Declared here (not as a local inside bind()) for the same reason as
+  // dragRef: bind(id, ...) runs its body fresh on every call, and
+  // StickerField calls bind() again for every sticker on every one of its
+  // own re-renders (state changes elsewhere in AudreySite.tsx, not just
+  // drag activity, can trigger this). A ref declared inside bind()'s
+  // closure would reset to null on any such re-render, silently dropping
+  // a touch gesture that was mid-threshold-check. One shared ref, tagged
+  // with which sticker it belongs to (mirroring dragRef's own `id`
+  // field), survives across renders like dragRef does.
+  const pendingTouchRef = useRef<null | { id: string; startX: number; startY: number; startT: number; el: HTMLDivElement }>(null);
 
   const applyTransform = useCallback((el: HTMLDivElement, x: number, y: number, z: number) => {
     el.style.transform = `translate3d(${x}px, ${y}px, 0)`;
@@ -66,8 +76,6 @@ export function useStickerDrag(containerRef: React.RefObject<HTMLElement | null>
 
   const bind = useCallback(
     (id: string, homeXPct: number, homeYPct: number, size: number) => {
-      const pendingTouchRef = { current: null as null | { startX: number; startY: number; startT: number; el: HTMLDivElement } };
-
       const claimDrag = (el: HTMLDivElement, e: React.PointerEvent<HTMLDivElement>) => {
         el.setPointerCapture(e.pointerId);
         el.style.touchAction = "none";
@@ -98,13 +106,15 @@ export function useStickerDrag(containerRef: React.RefObject<HTMLElement | null>
           return;
         }
         // Touch: wait for horizontal intent or a hold before claiming the
-        // gesture, so a vertical swipe here still scrolls the page.
-        pendingTouchRef.current = { startX: e.clientX, startY: e.clientY, startT: performance.now(), el };
+        // gesture, so a vertical swipe here still scrolls the page. Tagged
+        // with `id` because pendingTouchRef is now one shared ref (see the
+        // hook's top-level declaration) rather than a per-sticker local.
+        pendingTouchRef.current = { id, startX: e.clientX, startY: e.clientY, startT: performance.now(), el };
       };
 
       const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
         const pending = pendingTouchRef.current;
-        if (pending && !dragRef.current) {
+        if (pending && pending.id === id && !dragRef.current) {
           const dx = Math.abs(e.clientX - pending.startX);
           const dy = Math.abs(e.clientY - pending.startY);
           const held = performance.now() - pending.startT > 200;
@@ -136,7 +146,10 @@ export function useStickerDrag(containerRef: React.RefObject<HTMLElement | null>
       };
 
       const endDrag = (e: React.PointerEvent<HTMLDivElement>) => {
-        pendingTouchRef.current = null;
+        // Only clear a pending touch that actually belongs to this
+        // sticker — the shared ref may hold a different sticker's still-
+        // pending gesture (same single-slot tradeoff dragRef already has).
+        if (pendingTouchRef.current?.id === id) pendingTouchRef.current = null;
         const drag = dragRef.current;
         if (!drag || drag.id !== id) return;
         drag.el.releasePointerCapture(e.pointerId);
