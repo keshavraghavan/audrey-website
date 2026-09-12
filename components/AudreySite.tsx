@@ -202,6 +202,7 @@ export default function AudreySite() {
                 height: "50%",
                 background: "linear-gradient(rgba(255,255,255,0.22), rgba(255,255,255,0))",
                 zIndex: 1,
+                pointerEvents: "none",
               }}
             />
             <div style={{ position: "relative", zIndex: 2, display: "flex", justifyContent: "flex-start", alignItems: "center", gap: 32, flexWrap: "wrap" }}>
