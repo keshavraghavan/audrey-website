@@ -69,10 +69,18 @@ export default function StickerField() {
             marginTop: -s.size / 2,
             zIndex: s.layer,
             pointerEvents: "auto",
-            touchAction: "none",
           }}
         >
-          <div data-drift style={{ width: "100%", height: "100%" }}>
+          <div
+            data-drift
+            className="sticker-drift"
+            style={{
+              animationDuration: `${s.drift.duration}s`,
+              animationDelay: `${s.drift.delay}s`,
+              // amplitude scales the keyframes' fixed 1px/0.6deg shape
+              ["--drift-amp" as string]: s.drift.amplitude / 2,
+            }}
+          >
             <s.Art className="" />
           </div>
         </div>

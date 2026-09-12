@@ -66,9 +66,11 @@ export function useStickerDrag(containerRef: React.RefObject<HTMLElement | null>
 
   const bind = useCallback(
     (id: string, homeXPct: number, homeYPct: number, size: number) => {
-      const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-        const el = e.currentTarget;
+      const pendingTouchRef = { current: null as null | { startX: number; startY: number; startT: number; el: HTMLDivElement } };
+
+      const claimDrag = (el: HTMLDivElement, e: React.PointerEvent<HTMLDivElement>) => {
         el.setPointerCapture(e.pointerId);
+        el.style.touchAction = "none";
         const current = translateRef.current.get(id) ?? { x: 0, y: 0 };
         const driftEl = el.querySelector<HTMLElement>("[data-drift]");
         if (driftEl) driftEl.style.animationPlayState = "paused";
@@ -89,7 +91,38 @@ export function useStickerDrag(containerRef: React.RefObject<HTMLElement | null>
         applyTransform(el, current.x, current.y, topZ);
       };
 
+      const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+        const el = e.currentTarget;
+        if (e.pointerType !== "touch") {
+          claimDrag(el, e);
+          return;
+        }
+        // Touch: wait for horizontal intent or a hold before claiming the
+        // gesture, so a vertical swipe here still scrolls the page.
+        pendingTouchRef.current = { startX: e.clientX, startY: e.clientY, startT: performance.now(), el };
+      };
+
       const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+        const pending = pendingTouchRef.current;
+        if (pending && !dragRef.current) {
+          const dx = Math.abs(e.clientX - pending.startX);
+          const dy = Math.abs(e.clientY - pending.startY);
+          const held = performance.now() - pending.startT > 200;
+          if (dx > 8 && dy < 8) {
+            claimDrag(pending.el, e);
+            pendingTouchRef.current = null;
+          } else if (held) {
+            claimDrag(pending.el, e);
+            pendingTouchRef.current = null;
+          } else if (dy >= 8) {
+            // Vertical-first — this is a page scroll, not a drag. Stop
+            // tracking until the next pointerdown.
+            pendingTouchRef.current = null;
+            return;
+          } else {
+            return;
+          }
+        }
         const drag = dragRef.current;
         if (!drag || drag.id !== id) return;
         const container = containerRef.current;
@@ -103,9 +136,11 @@ export function useStickerDrag(containerRef: React.RefObject<HTMLElement | null>
       };
 
       const endDrag = (e: React.PointerEvent<HTMLDivElement>) => {
+        pendingTouchRef.current = null;
         const drag = dragRef.current;
         if (!drag || drag.id !== id) return;
-        e.currentTarget.releasePointerCapture(e.pointerId);
+        drag.el.releasePointerCapture(e.pointerId);
+        drag.el.style.touchAction = "";
         drag.el.style.willChange = "";
         if (drag.driftEl) drag.driftEl.style.animationPlayState = "running";
         dragRef.current = null;
