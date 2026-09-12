@@ -657,6 +657,19 @@ import StickerField from "@/components/stickers/StickerField";
                 right: 0,
                 height: "50%",
                 background: "linear-gradient(rgba(255,255,255,0.42), rgba(255,255,255,0))",
+                // StickerField's root now carries an explicit zIndex: 1 (see
+                // its own file) so it can contain drag-promoted sticker
+                // z-indexes below the content layer. That has a side
+                // effect: a sibling with no z-index at all (auto) paints
+                // *underneath* any positioned sibling that has an explicit
+                // positive z-index, regardless of DOM order — so without
+                // this line, the sheen would render fully hidden behind
+                // StickerField's opaque checker background. Giving it the
+                // same z-index (1) puts it in the same paint tier, where
+                // DOM order (this div comes after StickerField) breaks the
+                // tie in the sheen's favor, restoring it above the checker
+                // and still below the title wrapper's zIndex: 2.
+                zIndex: 1,
               }}
             />
 ```
