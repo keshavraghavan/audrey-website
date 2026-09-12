@@ -54,8 +54,13 @@ export function DieCutShape({
 }
 
 /** Hard-banded grey→white→grey chrome gradient (per spec §3 — the only
- * smooth-looking gradient besides the rainbow arc/streak, and even this one
- * uses a hard band rather than a soft blend). */
+ * gradient besides the rainbow arc/streak, and even this one is three flat
+ * bands with a sharp cut at each boundary, not a soft blend). Two `<stop>`s
+ * at the same offset is what actually produces a hard edge in SVG: offsets
+ * are required to be non-decreasing in document order, so the pair must be
+ * interleaved with the rest in ascending order — appending a second pass
+ * of "hard" stops after stop offset 1 is already reached clamps every one
+ * of them back up to 1 and silently erases the band effect. */
 export function ChromeGradient({
   id,
   x1 = "0",
@@ -69,20 +74,28 @@ export function ChromeGradient({
   x2?: string;
   y2?: string;
 }) {
+  const grey = "#8a8a8a";
+  const white = "#ffffff";
   return (
     <linearGradient id={id} x1={x1} y1={y1} x2={x2} y2={y2}>
-      <stop offset="0" stopColor="#8a8a8a" />
-      <stop offset="0.32" stopColor="#f2f2f2" />
-      <stop offset="0.5" stopColor="#ffffff" />
-      <stop offset="0.68" stopColor="#f2f2f2" />
-      <stop offset="1" stopColor="#8a8a8a" />
+      <stop offset={0} stopColor={grey} />
+      <stop offset={1 / 3} stopColor={grey} />
+      <stop offset={1 / 3} stopColor={white} />
+      <stop offset={2 / 3} stopColor={white} />
+      <stop offset={2 / 3} stopColor={grey} />
+      <stop offset={1} stopColor={grey} />
     </linearGradient>
   );
 }
 
-/** Six-hard-stop refraction arc using the site's own accent family, per
- * spec §5 (#7 CD-R) and §5 (#17 vinyl record) — paired stops at nearly the
- * same offset create a hard edge between bands instead of a blend. */
+/** Six-band hard-cut refraction arc using the site's own accent family, per
+ * spec §5 (#7 CD-R) and §5 (#17 vinyl record) — six equal flat-color bands
+ * (pink, teal, gold, lavender, rust, pink) with a sharp cut at each of the
+ * five internal boundaries, built the same way as ChromeGradient: each
+ * band contributes a start and end `<stop>` at the same color, and two
+ * adjacent bands share their boundary offset with different colors, which
+ * is what creates the hard edge (see ChromeGradient's comment for why the
+ * offsets must be interleaved, not appended). */
 export function RainbowGradient({
   id,
   x1 = "0",
@@ -96,21 +109,16 @@ export function RainbowGradient({
   x2?: string;
   y2?: string;
 }) {
-  const bands: [number, string][] = [
-    [0, PINK],
-    [0.2, TEAL],
-    [0.4, GOLD],
-    [0.6, LAVENDER],
-    [0.8, RUST],
-    [1, PINK],
-  ];
+  const colors = [PINK, TEAL, GOLD, LAVENDER, RUST, PINK];
+  const stops: { offset: number; color: string }[] = [];
+  colors.forEach((color, i) => {
+    stops.push({ offset: i / colors.length, color });
+    stops.push({ offset: (i + 1) / colors.length, color });
+  });
   return (
     <linearGradient id={id} x1={x1} y1={y1} x2={x2} y2={y2}>
-      {bands.map(([offset, color], i) => (
-        <stop key={i} offset={offset} stopColor={color} />
-      ))}
-      {bands.slice(0, -1).map(([offset], i) => (
-        <stop key={`hard-${i}`} offset={Math.min(offset + 0.001, 1)} stopColor={bands[i + 1][1]} />
+      {stops.map((s, i) => (
+        <stop key={i} offset={s.offset} stopColor={s.color} />
       ))}
     </linearGradient>
   );
