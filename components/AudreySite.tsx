@@ -5,6 +5,7 @@ import HomeTab from "@/components/tabs/HomeTab";
 import SoundsTab from "@/components/tabs/SoundsTab";
 import PhotosTab from "@/components/tabs/PhotosTab";
 import GuestbookTab from "@/components/tabs/GuestbookTab";
+import StickerField from "@/components/stickers/StickerField";
 import {
   ACCENT,
   AGE,
@@ -186,12 +187,12 @@ export default function AudreySite() {
         >
           <div
             style={{
-              background:
-                "linear-gradient(180deg, var(--accent-soft) 0%, var(--accent) 48%, var(--accent-dark) 52%, var(--accent) 100%)",
+              background: "#f6ebf1",
               padding: "clamp(28px, 4vw, 44px) clamp(20px, 4vw, 48px) clamp(30px, 4vw, 46px)",
               position: "relative",
             }}
           >
+            <StickerField />
             <div
               style={{
                 position: "absolute",
@@ -199,10 +200,10 @@ export default function AudreySite() {
                 left: 0,
                 right: 0,
                 height: "50%",
-                background: "linear-gradient(rgba(255,255,255,0.42), rgba(255,255,255,0))",
+                background: "linear-gradient(rgba(255,255,255,0.22), rgba(255,255,255,0))",
               }}
             />
-            <div style={{ position: "relative", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 32, flexWrap: "wrap" }}>
+            <div style={{ position: "relative", zIndex: 2, display: "flex", justifyContent: "flex-start", alignItems: "center", gap: 32, flexWrap: "wrap" }}>
               <div style={{ maxWidth: "min(520px, 100%)" }}>
                 <div style={{ fontFamily: "var(--font-press-start-2p)", fontSize: 11, color: "#ffd9ec", letterSpacing: "0.05em" }}>
                   {nameUpper} · VERSION {AGE}.0
@@ -269,22 +270,6 @@ export default function AudreySite() {
                 >
                   ◄ NEW ► {daysLabel}
                 </div>
-              </div>
-              <div
-                style={{
-                  flex: "none",
-                  width: "clamp(116px, 17vw, 172px)",
-                  height: "clamp(116px, 17vw, 172px)",
-                  borderRadius: "50%",
-                  background: "conic-gradient(from 200deg, #7de3e3, #ff5fb0, #ffe680, #7de3e3, #ff5fb0)",
-                  boxShadow: "0 10px 26px rgba(0,0,0,0.32)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  animation: "cd-spin 9s linear infinite",
-                }}
-              >
-                <div style={{ width: 52, height: 52, borderRadius: "50%", background: "var(--accent)", boxShadow: "inset 0 0 0 7px #fff" }} />
               </div>
             </div>
           </div>
