@@ -1278,7 +1278,7 @@ export default function Digicam({ className }: { className?: string }) {
 // lib/stickers/art/hair-clips.tsx
 // Per spec §5 #4: pair of butterfly clips, one chrome/iridescent, one
 // recolored to lavender (was matte black).
-import { DieCutShape, ChromeGradient, STICKER_SVG_STYLE, VIEWBOX } from "../shared-defs";
+import { ChromeGradient, STICKER_SVG_STYLE, VIEWBOX } from "../shared-defs";
 import { LAVENDER, INK } from "../palette";
 
 function ButterflyWings({ cx, cy, fill }: { cx: number; cy: number; fill: string }) {
@@ -1338,7 +1338,7 @@ export default function HairClips({ className }: { className?: string }) {
 // lib/stickers/art/studded-belt.tsx
 // Per spec §5 #5: fragment running diagonally off both sticker edges, ink
 // leather, chrome pyramid studs.
-import { DieCutShape, ChromeGradient, STICKER_SVG_STYLE, VIEWBOX } from "../shared-defs";
+import { ChromeGradient, STICKER_SVG_STYLE, VIEWBOX } from "../shared-defs";
 import { INK } from "../palette";
 
 export default function StuddedBelt({ className }: { className?: string }) {
@@ -1351,9 +1351,9 @@ export default function StuddedBelt({ className }: { className?: string }) {
       {/* the strap itself is not die-cut individually inset — it's designed
           to bleed off both edges, per spec §1/§5 */}
       <path d="M-6 74 L106 26 L106 44 L-6 92 Z" fill={INK} stroke={INK} strokeWidth="3" strokeLinejoin="round" />
-      <path d="M-6 74 L106 26" stroke="#fff" strokeWidth="9" strokeLinecap="round" opacity="0" />
-      {studs.map((x, i) => {
-        const y = 74 - (x + 6) * (48 / 112) + i * 0; // approximate the strap's slope
+      {studs.map((x) => {
+        // centerline of the diagonal strap band at this x (the band runs
+        // from (-6,74)-(106,26) on top to (-6,92)-(106,44) on the bottom)
         const cy = 83 - ((x + 6) / 112) * 48;
         return (
           <path
