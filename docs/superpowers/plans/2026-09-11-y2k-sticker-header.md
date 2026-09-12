@@ -122,8 +122,13 @@ export function DieCutShape({
 }
 
 /** Hard-banded grey→white→grey chrome gradient (per spec §3 — the only
- * smooth-looking gradient besides the rainbow arc/streak, and even this one
- * uses a hard band rather than a soft blend). */
+ * gradient besides the rainbow arc/streak, and even this one is three flat
+ * bands with a sharp cut at each boundary, not a soft blend). Two `<stop>`s
+ * at the same offset is what actually produces a hard edge in SVG: offsets
+ * are required to be non-decreasing in document order, so the pair must be
+ * interleaved with the rest in ascending order — appending a second pass
+ * of "hard" stops after stop offset 1 is already reached clamps every one
+ * of them back up to 1 and silently erases the band effect. */
 export function ChromeGradient({
   id,
   x1 = "0",
@@ -137,20 +142,28 @@ export function ChromeGradient({
   x2?: string;
   y2?: string;
 }) {
+  const grey = "#8a8a8a";
+  const white = "#ffffff";
   return (
     <linearGradient id={id} x1={x1} y1={y1} x2={x2} y2={y2}>
-      <stop offset="0" stopColor="#8a8a8a" />
-      <stop offset="0.32" stopColor="#f2f2f2" />
-      <stop offset="0.5" stopColor="#ffffff" />
-      <stop offset="0.68" stopColor="#f2f2f2" />
-      <stop offset="1" stopColor="#8a8a8a" />
+      <stop offset={0} stopColor={grey} />
+      <stop offset={1 / 3} stopColor={grey} />
+      <stop offset={1 / 3} stopColor={white} />
+      <stop offset={2 / 3} stopColor={white} />
+      <stop offset={2 / 3} stopColor={grey} />
+      <stop offset={1} stopColor={grey} />
     </linearGradient>
   );
 }
 
-/** Six-hard-stop refraction arc using the site's own accent family, per
- * spec §5 (#7 CD-R) and §5 (#17 vinyl record) — paired stops at nearly the
- * same offset create a hard edge between bands instead of a blend. */
+/** Six-band hard-cut refraction arc using the site's own accent family, per
+ * spec §5 (#7 CD-R) and §5 (#17 vinyl record) — six equal flat-color bands
+ * (pink, teal, gold, lavender, rust, pink) with a sharp cut at each of the
+ * five internal boundaries, built the same way as ChromeGradient: each
+ * band contributes a start and end `<stop>` at the same color, and two
+ * adjacent bands share their boundary offset with different colors, which
+ * is what creates the hard edge (see ChromeGradient's comment for why the
+ * offsets must be interleaved, not appended). */
 export function RainbowGradient({
   id,
   x1 = "0",
@@ -164,21 +177,16 @@ export function RainbowGradient({
   x2?: string;
   y2?: string;
 }) {
-  const bands: [number, string][] = [
-    [0, PINK],
-    [0.2, TEAL],
-    [0.4, GOLD],
-    [0.6, LAVENDER],
-    [0.8, RUST],
-    [1, PINK],
-  ];
+  const colors = [PINK, TEAL, GOLD, LAVENDER, RUST, PINK];
+  const stops: { offset: number; color: string }[] = [];
+  colors.forEach((color, i) => {
+    stops.push({ offset: i / colors.length, color });
+    stops.push({ offset: (i + 1) / colors.length, color });
+  });
   return (
     <linearGradient id={id} x1={x1} y1={y1} x2={x2} y2={y2}>
-      {bands.map(([offset, color], i) => (
-        <stop key={i} offset={offset} stopColor={color} />
-      ))}
-      {bands.slice(0, -1).map(([offset], i) => (
-        <stop key={`hard-${i}`} offset={Math.min(offset + 0.001, 1)} stopColor={bands[i + 1][1]} />
+      {stops.map((s, i) => (
+        <stop key={i} offset={s.offset} stopColor={s.color} />
       ))}
     </linearGradient>
   );
@@ -247,7 +255,27 @@ assert.match(shapeMarkup, /stroke="#fff"/);
 assert.match(shapeMarkup, /fill="#ff2d95"/);
 assert.match(shapeMarkup, /stroke="#2b0a1e"/);
 
-// ChromeGradient has 5 stops and starts/ends on the same grey.
+// Extracts [offset, stopColor] pairs from rendered <stop> markup, in
+// document order — this is what actually proves (or disproves) a hard
+// edge: SVG stop offsets must be non-decreasing, and two stops sharing the
+// same offset with different colors is what a hard band edge is, in the
+// rendered markup. A test that only checks each color's hex string
+// appears somewhere (as the previous version of this script did) cannot
+// tell a genuine hard-banded gradient apart from a smoothly interpolated
+// one with the same color set — this one can.
+function extractStops(markup: string): [number, string][] {
+  // React's server renderer emits the raw SVG presentation attribute name
+  // (kebab-case "stop-color"), not the JSX prop name "stopColor" — matched
+  // and confirmed by hand against actual renderToStaticMarkup output.
+  const re = /<stop offset="([^"]*)" stop-color="([^"]*)"/g;
+  const out: [number, string][] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(markup))) out.push([Number(m[1]), m[2]]);
+  return out;
+}
+
+// ChromeGradient: 6 stops, offsets non-decreasing, and a genuine hard edge
+// (two stops at the same offset, different colors) at both 1/3 and 2/3.
 const chromeMarkup = renderToStaticMarkup(
   <svg>
     <defs>
@@ -255,10 +283,20 @@ const chromeMarkup = renderToStaticMarkup(
     </defs>
   </svg>,
 );
-assert.equal((chromeMarkup.match(/<stop/g) ?? []).length, 5);
 assert.match(chromeMarkup, /id="chrome-test"/);
+const chromeStops = extractStops(chromeMarkup);
+assert.equal(chromeStops.length, 6, `expected 6 <stop>s, got ${chromeStops.length}`);
+for (let i = 1; i < chromeStops.length; i++) {
+  assert.ok(chromeStops[i][0] >= chromeStops[i - 1][0], "chrome stop offsets must be non-decreasing");
+}
+const chromeHardEdges = chromeStops.filter(
+  ([offset], i) => i > 0 && offset === chromeStops[i - 1][0] && chromeStops[i][1] !== chromeStops[i - 1][1],
+);
+assert.equal(chromeHardEdges.length, 2, "chrome gradient must have exactly 2 hard edges (grey/white, white/grey)");
 
-// RainbowGradient covers all 5 accent colors.
+// RainbowGradient: 12 stops (6 bands x 2), offsets non-decreasing, covers
+// all 5 accent colors, and has a genuine hard edge at each of the 5
+// internal band boundaries.
 const rainbowMarkup = renderToStaticMarkup(
   <svg>
     <defs>
@@ -269,6 +307,15 @@ const rainbowMarkup = renderToStaticMarkup(
 for (const color of ["#ff2d95", "#009a9a", "#ffb300", "#7a4dff", "#a8330f"]) {
   assert.match(rainbowMarkup, new RegExp(color));
 }
+const rainbowStops = extractStops(rainbowMarkup);
+assert.equal(rainbowStops.length, 12, `expected 12 <stop>s, got ${rainbowStops.length}`);
+for (let i = 1; i < rainbowStops.length; i++) {
+  assert.ok(rainbowStops[i][0] >= rainbowStops[i - 1][0], "rainbow stop offsets must be non-decreasing");
+}
+const rainbowHardEdges = rainbowStops.filter(
+  ([offset], i) => i > 0 && offset === rainbowStops[i - 1][0] && rainbowStops[i][1] !== rainbowStops[i - 1][1],
+);
+assert.equal(rainbowHardEdges.length, 5, "rainbow gradient must have exactly 5 hard edges (one per internal band boundary)");
 
 // Pattern defs render with the requested id and a dot/checker child.
 const halftoneMarkup = renderToStaticMarkup(
