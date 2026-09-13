@@ -3,6 +3,28 @@
 
 import { useCallback, useRef } from "react";
 
+const STORAGE_KEY = "y2k:sticker-positions";
+
+export function loadStickerPositions(): Record<string, { x: number; y: number }> {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null) return {};
+    return parsed as Record<string, { x: number; y: number }>;
+  } catch {
+    return {};
+  }
+}
+
+export function saveStickerPositions(positions: Record<string, { x: number; y: number }>): void {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(positions));
+  } catch {
+    // Storage full or disabled — the session still works, it just won't persist.
+  }
+}
+
 /**
  * Clamps a proposed drag translate (dx, dy, relative to the sticker's home
  * position) so at least 60% of the sticker stays inside the container.
@@ -60,6 +82,18 @@ export function useStickerDrag(containerRef: React.RefObject<HTMLElement | null>
   // with which sticker it belongs to (mirroring dragRef's own `id`
   // field), survives across renders like dragRef does.
   const pendingTouchRef = useRef<null | { id: string; startX: number; startY: number; startT: number; el: HTMLDivElement }>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scheduleSave = useCallback(() => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      const positions: Record<string, { x: number; y: number }> = {};
+      translateRef.current.forEach((v, k) => {
+        positions[k] = v;
+      });
+      saveStickerPositions(positions);
+    }, 400);
+  }, []);
 
   const applyTransform = useCallback((el: HTMLDivElement, x: number, y: number, z: number) => {
     el.style.transform = `translate3d(${x}px, ${y}px, 0)`;
@@ -157,6 +191,7 @@ export function useStickerDrag(containerRef: React.RefObject<HTMLElement | null>
         drag.el.style.willChange = "";
         if (drag.driftEl) drag.driftEl.style.animationPlayState = "running";
         dragRef.current = null;
+        scheduleSave();
       };
 
       return {
@@ -166,8 +201,15 @@ export function useStickerDrag(containerRef: React.RefObject<HTMLElement | null>
         onPointerCancel: endDrag,
       };
     },
-    [applyTransform, scheduleWrite, containerRef],
+    [applyTransform, scheduleWrite, containerRef, scheduleSave],
   );
 
-  return { bind };
+  const getPosition = useCallback((id: string) => translateRef.current.get(id), []);
+
+  const resetAll = useCallback(() => {
+    translateRef.current.clear();
+    saveStickerPositions({});
+  }, []);
+
+  return { bind, getPosition, resetAll };
 }
