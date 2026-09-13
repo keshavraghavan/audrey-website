@@ -21,9 +21,6 @@ export default function CdR({ className }: { className?: string }) {
       />
       <circle cx="50" cy="50" r="9" fill={CREAM} stroke={INK} strokeWidth="1.5" />
       <circle cx="50" cy="50" r="3" fill="none" stroke={INK} strokeWidth="1.2" />
-      <text x="50" y="70" textAnchor="middle" fontFamily="cursive" fontSize="8" fill={INK} transform="rotate(-4 50 70)">
-        for you :)
-      </text>
     </svg>
   );
 }

@@ -8,12 +8,10 @@ import StuddedBelt from "./art/studded-belt";
 import PlatformBoot from "./art/platform-boot";
 import CdR from "./art/cd-r";
 import BrickPhone from "./art/brick-phone";
-import SoWrong from "./art/so-wrong";
 import TwoGood4U from "./art/2-good-4-u";
 import NoSignal from "./art/no-signal";
 import Whatever from "./art/whatever";
 import BookStack from "./art/book-stack";
-import BrokenHeart from "./art/broken-heart";
 import CassetteTape from "./art/cassette-tape";
 import Sunglasses from "./art/sunglasses";
 import VinylRecord from "./art/vinyl-record";
@@ -63,10 +61,8 @@ export const STICKERS: StickerDef[] = [
 
   // --- dense zone: small filler (48-70px), some overlapping the hero pieces ---
   { id: "hair-clips", Art: HairClips, size: 58, home: { x: 60, y: 22 }, rotation: 16, layer: 14, drift: { amplitude: 3, duration: 8, delay: 4.1 } },
-  { id: "broken-heart", Art: BrokenHeart, size: 64, home: { x: 90, y: 82 }, rotation: -8, layer: 15, drift: { amplitude: 3, duration: 12, delay: 6.2 } },
   { id: "halftone-patch", Art: HalftonePatch, size: 56, home: { x: 70, y: 74 }, rotation: 18, layer: 2, drift: { amplitude: 3, duration: 9, delay: 9.1 } },
   { id: "checkerboard", Art: Checkerboard, size: 54, home: { x: 80, y: 70 }, rotation: -13, layer: 1, drift: { amplitude: 3, duration: 11, delay: 2.9 } },
-  { id: "so-wrong", Art: SoWrong, size: 66, home: { x: 84, y: 12 }, rotation: -5, layer: 16, drift: { amplitude: 3, duration: 8, delay: 7.4 } },
   { id: "2-good-4-u", Art: TwoGood4U, size: 68, home: { x: 72, y: 46 }, rotation: 6, layer: 4, drift: { amplitude: 3, duration: 10, delay: 3.5 } },
   { id: "no-signal", Art: NoSignal, size: 60, home: { x: 96, y: 48 }, rotation: -7, layer: 5, drift: { amplitude: 3, duration: 12, delay: 1.6 } },
 ];

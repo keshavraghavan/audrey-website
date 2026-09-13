@@ -26,10 +26,8 @@ export default function GuestbookTab({
   liked,
   onToggleLike,
   formName,
-  formRelation,
   formBody,
   onFormNameChange,
-  onFormRelationChange,
   onFormBodyChange,
   notice,
   onPostMessage,
@@ -38,10 +36,8 @@ export default function GuestbookTab({
   liked: Record<string, boolean>;
   onToggleLike: (id: string) => void;
   formName: string;
-  formRelation: string;
   formBody: string;
   onFormNameChange: (value: string) => void;
-  onFormRelationChange: (value: string) => void;
   onFormBodyChange: (value: string) => void;
   notice: string;
   onPostMessage: () => void;
@@ -131,12 +127,6 @@ export default function GuestbookTab({
           The prompt, if you want one: <em>the first time I met Audrey…</em>
         </div>
         <input value={formName} onChange={(e) => onFormNameChange(e.target.value)} placeholder="your name" style={inputStyle} />
-        <input
-          value={formRelation}
-          onChange={(e) => onFormRelationChange(e.target.value)}
-          placeholder="how you know her"
-          style={inputStyle}
-        />
         <textarea
           value={formBody}
           onChange={(e) => onFormBodyChange(e.target.value)}

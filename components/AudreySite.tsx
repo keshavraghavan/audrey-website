@@ -38,7 +38,6 @@ export default function AudreySite() {
   const [hydrated, setHydrated] = useState(false);
 
   const [formName, setFormName] = useState("");
-  const [formRelation, setFormRelation] = useState("");
   const [formBody, setFormBody] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -90,7 +89,7 @@ export default function AudreySite() {
     const msg: GuestbookMessage = {
       id: "u" + Date.now(),
       name: formName.trim(),
-      meta: (formRelation.trim() ? formRelation.trim() + " · " : "") + "just now",
+      meta: "just now",
       swatch: "linear-gradient(135deg, #ff8ec9, #d6006e)",
       tint: "pink",
       likes: 0,
@@ -98,10 +97,9 @@ export default function AudreySite() {
     };
     setMessages((m) => [msg, ...m]);
     setFormName("");
-    setFormRelation("");
     setFormBody("");
     setNotice("Posted — she'll see it on the 20th.");
-  }, [formName, formRelation, formBody]);
+  }, [formName, formBody]);
 
   const addSong = useCallback(() => {
     if (!songTitle.trim()) return;
@@ -341,10 +339,8 @@ export default function AudreySite() {
               liked={liked}
               onToggleLike={toggleLike}
               formName={formName}
-              formRelation={formRelation}
               formBody={formBody}
               onFormNameChange={setFormName}
-              onFormRelationChange={setFormRelation}
               onFormBodyChange={setFormBody}
               notice={notice}
               onPostMessage={postMessage}

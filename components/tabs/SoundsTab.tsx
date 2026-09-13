@@ -1,4 +1,4 @@
-import { ARTISTS, type Track } from "@/lib/audrey-data";
+import { type Track } from "@/lib/audrey-data";
 
 const inputStyle = {
   border: "none",
@@ -30,55 +30,8 @@ export default function SoundsTab({
   onAddSong: () => void;
 }) {
   return (
-    <div
-      style={{
-        padding: "clamp(22px, 3vw, 34px) clamp(16px, 3vw, 40px) 46px",
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-        gap: 34,
-      }}
-    >
-      <div>
-        <h2 style={{ margin: 0, fontFamily: "var(--font-archivo-black)", fontSize: 30, color: "var(--accent)", letterSpacing: "-0.025em" }}>
-          HER SOUNDS
-        </h2>
-        <p style={{ margin: "8px 0 0", fontSize: 13, color: "#7f5f70" }}>Top artists this year, straight from Spotify.</p>
-        <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 10 }}>
-          {ARTISTS.map((a, i) => (
-            <div
-              key={a.name}
-              style={{
-                display: "flex",
-                gap: 13,
-                alignItems: "center",
-                borderRadius: 12,
-                background: "linear-gradient(#fdf7f9, #f6e8ef)",
-                boxShadow: "0 3px 0 #f4d3e3",
-                padding: "12px 14px",
-              }}
-            >
-              <div style={{ fontFamily: "var(--font-archivo-black)", fontSize: 18, color: "#ffb3dd", width: 24, flex: "none" }}>
-                {i + 1}
-              </div>
-              <div
-                style={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: 9,
-                  flex: "none",
-                  background: `linear-gradient(135deg, ${a.colors[0]}, ${a.colors[1]})`,
-                }}
-              />
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#7a0048" }}>{a.name}</div>
-                <div style={{ fontSize: 11, color: "#8a5875" }}>{a.note}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div>
+    <div style={{ padding: "clamp(22px, 3vw, 34px) clamp(16px, 3vw, 40px) 46px" }}>
+      <div style={{ maxWidth: 480 }}>
         <h2 style={{ margin: 0, fontFamily: "var(--font-archivo-black)", fontSize: 30, color: "#00a3a3", letterSpacing: "-0.025em" }}>
           THE BIRTHDAY MIX
         </h2>

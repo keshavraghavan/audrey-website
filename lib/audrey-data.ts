@@ -64,20 +64,6 @@ export const SEED_MESSAGES: GuestbookMessage[] = [
   },
 ];
 
-export type Artist = {
-  name: string;
-  note: string;
-  colors: [string, string];
-};
-
-export const ARTISTS: Artist[] = [
-  { name: "Fiona Apple", note: "most played, 3 years running", colors: ["#ff8ec9", "#c800a8"] },
-  { name: "Alvvays", note: "Blue Rev on loop", colors: ["#7de3e3", "#009a9a"] },
-  { name: "Black Country, New Road", note: "Ants From Up There", colors: ["#ffe680", "#ffb300"] },
-  { name: "Big Thief", note: "142 hours this year", colors: ["#c9a7ff", "#7a4dff"] },
-  { name: "Adrianne Lenker", note: "the sad-book soundtrack", colors: ["#ff6a3d", "#a8330f"] },
-];
-
 export type Track = {
   title: string;
   artist: string;
