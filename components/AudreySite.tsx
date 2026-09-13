@@ -207,7 +207,7 @@ export default function AudreySite() {
             />
             <div style={{ position: "relative", zIndex: 2, display: "flex", justifyContent: "flex-start", alignItems: "center", gap: 32, flexWrap: "wrap" }}>
               <div style={{ maxWidth: "min(520px, 100%)" }}>
-                <div style={{ fontFamily: "var(--font-press-start-2p)", fontSize: 11, color: "#ffd9ec", letterSpacing: "0.05em" }}>
+                <div style={{ fontFamily: "var(--font-press-start-2p)", fontSize: 11, color: "#a3005e", letterSpacing: "0.05em" }}>
                   {nameUpper} · VERSION {AGE}.0
                 </div>
                 <h1
@@ -217,8 +217,8 @@ export default function AudreySite() {
                     fontSize: "clamp(38px, 7vw, 72px)",
                     lineHeight: 0.9,
                     letterSpacing: "-0.04em",
-                    color: "#fff",
-                    textShadow: "0 3px 0 #a3005e, 0 7px 16px rgba(0,0,0,0.28)",
+                    color: "#a3005e",
+                    textShadow: "0 3px 0 rgba(255,255,255,0.7), 0 6px 14px rgba(122,0,72,0.18)",
                   }}
                 >
                   HAPPY
@@ -266,7 +266,7 @@ export default function AudreySite() {
                     marginTop: 18,
                     fontFamily: "var(--font-vt323)",
                     fontSize: 21,
-                    color: "#ffe680",
+                    color: "#7a0048",
                     animation: "cd-blink 1.3s steps(1) infinite",
                   }}
                 >

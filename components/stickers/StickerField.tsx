@@ -8,7 +8,7 @@ import { useStickerDrag, loadStickerPositions } from "@/hooks/useStickerDrag";
 
 export default function StickerField() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { bind, resetAll } = useStickerDrag(containerRef);
+  const { bind, resetAll, hydrate } = useStickerDrag(containerRef);
   const [resetKey, setResetKey] = useState(0);
 
   useEffect(() => {
@@ -16,6 +16,7 @@ export default function StickerField() {
     // the pattern already used in components/AudreySite.tsx and
     // components/PhotoSlot.tsx, so server and first client render match.
     const saved = loadStickerPositions();
+    hydrate(saved);
     for (const s of STICKERS) {
       const pos = saved[s.id];
       if (!pos) continue;
@@ -24,7 +25,7 @@ export default function StickerField() {
         el.style.transform = `translate3d(${pos.x}px, ${pos.y}px, 0)`;
       }
     }
-  }, [resetKey]);
+  }, [resetKey, hydrate]);
 
   const shakeItUp = () => {
     resetAll();
@@ -61,18 +62,15 @@ export default function StickerField() {
           zIndex: 1,
         }}
       >
-        <svg width="0" height="0" style={{ position: "absolute" }}>
+        <svg
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+          aria-hidden="true"
+        >
           <defs>
             <CheckerPattern id="sticker-field-checker" />
           </defs>
+          <rect width="100%" height="100%" fill="url(#sticker-field-checker)" />
         </svg>
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            background: "url(#sticker-field-checker)",
-          }}
-        />
         <div
           style={{
             position: "absolute",
@@ -100,6 +98,7 @@ export default function StickerField() {
               marginTop: -s.size / 2,
               zIndex: s.layer,
               pointerEvents: "auto",
+              touchAction: "pan-y",
             }}
           >
             <div
@@ -112,7 +111,13 @@ export default function StickerField() {
                 ["--drift-amp" as string]: s.drift.amplitude / 2,
               }}
             >
-              <s.Art className="" />
+              {/* Static per-sticker rotation, baked in as its own wrapper
+                  (spec §7.2) — it can't live on the data-drift div itself,
+                  since that div's CSS animation fully overwrites `transform`
+                  every frame and would clobber a rotation set there. */}
+              <div style={{ width: "100%", height: "100%", transform: `rotate(${s.rotation}deg)` }}>
+                <s.Art className="" />
+              </div>
             </div>
           </div>
         ))}
@@ -124,7 +129,7 @@ export default function StickerField() {
           position: "absolute",
           right: 14,
           bottom: 12,
-          zIndex: 3,
+          zIndex: 2,
           pointerEvents: "auto",
           fontSize: 11,
           fontWeight: 700,

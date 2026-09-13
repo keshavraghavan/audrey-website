@@ -6,6 +6,9 @@ import { PINK, INK } from "../palette";
 export default function SoWrong({ className }: { className?: string }) {
   return (
     <svg viewBox={VIEWBOX} className={className} style={STICKER_SVG_STYLE}>
+      <text x="50" y="46" textAnchor="middle" fontFamily="Arial Rounded MT Bold, Arial, sans-serif" fontWeight="900" fontSize="20" fill="none" stroke="#fff" strokeWidth="7">
+        SO
+      </text>
       <text
         x="50"
         y="46"
@@ -19,6 +22,9 @@ export default function SoWrong({ className }: { className?: string }) {
         paintOrder="stroke"
       >
         SO
+      </text>
+      <text x="50" y="72" textAnchor="middle" fontFamily="Arial Rounded MT Bold, Arial, sans-serif" fontWeight="900" fontSize="20" fill="none" stroke="#fff" strokeWidth="7">
+        WRONG
       </text>
       <text
         x="50"

@@ -10,7 +10,7 @@ export function loadStickerPositions(): Record<string, { x: number; y: number }>
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw);
-    if (typeof parsed !== "object" || parsed === null) return {};
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return {};
     return parsed as Record<string, { x: number; y: number }>;
   } catch {
     return {};
@@ -28,8 +28,7 @@ export function saveStickerPositions(positions: Record<string, { x: number; y: n
 /**
  * Clamps a proposed drag translate (dx, dy, relative to the sticker's home
  * position) so at least 60% of the sticker stays inside the container.
- * Pure and side-effect-free so it's independently testable — see
- * hooks/verify-clamp.ts.
+ * Pure and side-effect-free so it's independently testable.
  */
 export function clampTranslate(
   dx: number,
@@ -71,6 +70,8 @@ export function useStickerDrag(containerRef: React.RefObject<HTMLElement | null>
     size: number;
     homeXPct: number;
     homeYPct: number;
+    containerWidth: number;
+    containerHeight: number;
   } | null>(null);
   // Declared here (not as a local inside bind()) for the same reason as
   // dragRef: bind(id, ...) runs its body fresh on every call, and
@@ -111,6 +112,17 @@ export function useStickerDrag(containerRef: React.RefObject<HTMLElement | null>
   const bind = useCallback(
     (id: string, homeXPct: number, homeYPct: number, size: number) => {
       const claimDrag = (el: HTMLDivElement, e: React.PointerEvent<HTMLDivElement>) => {
+        // If a different sticker's drag is still active when this one
+        // claims, finalize its styles first — otherwise it's stranded
+        // with touch-action/will-change/paused-drift never cleared (this
+        // doesn't add multi-touch support, it just prevents style leaks
+        // from the known single-active-drag limitation).
+        const prev = dragRef.current;
+        if (prev && prev.id !== id) {
+          prev.el.style.touchAction = "pan-y";
+          prev.el.style.willChange = "";
+          if (prev.driftEl) prev.driftEl.style.animationPlayState = "running";
+        }
         el.setPointerCapture(e.pointerId);
         el.style.touchAction = "none";
         const current = translateRef.current.get(id) ?? { x: 0, y: 0 };
@@ -118,6 +130,7 @@ export function useStickerDrag(containerRef: React.RefObject<HTMLElement | null>
         if (driftEl) driftEl.style.animationPlayState = "paused";
         el.style.willChange = "transform";
         topZ += 1;
+        const containerRect = containerRef.current?.getBoundingClientRect();
         dragRef.current = {
           id,
           el,
@@ -129,6 +142,8 @@ export function useStickerDrag(containerRef: React.RefObject<HTMLElement | null>
           size,
           homeXPct,
           homeYPct,
+          containerWidth: containerRect?.width ?? 0,
+          containerHeight: containerRect?.height ?? 0,
         };
         applyTransform(el, current.x, current.y, topZ);
       };
@@ -169,12 +184,9 @@ export function useStickerDrag(containerRef: React.RefObject<HTMLElement | null>
         }
         const drag = dragRef.current;
         if (!drag || drag.id !== id) return;
-        const container = containerRef.current;
-        if (!container) return;
-        const rect = container.getBoundingClientRect();
         const rawDx = drag.baseX + (e.clientX - drag.startX);
         const rawDy = drag.baseY + (e.clientY - drag.startY);
-        const clamped = clampTranslate(rawDx, rawDy, drag.size, rect.width, rect.height, drag.homeXPct, drag.homeYPct);
+        const clamped = clampTranslate(rawDx, rawDy, drag.size, drag.containerWidth, drag.containerHeight, drag.homeXPct, drag.homeYPct);
         translateRef.current.set(id, clamped);
         scheduleWrite(drag.el, clamped.x, clamped.y, topZ);
       };
@@ -187,7 +199,7 @@ export function useStickerDrag(containerRef: React.RefObject<HTMLElement | null>
         const drag = dragRef.current;
         if (!drag || drag.id !== id) return;
         drag.el.releasePointerCapture(e.pointerId);
-        drag.el.style.touchAction = "";
+        drag.el.style.touchAction = "pan-y";
         drag.el.style.willChange = "";
         if (drag.driftEl) drag.driftEl.style.animationPlayState = "running";
         dragRef.current = null;
@@ -211,5 +223,20 @@ export function useStickerDrag(containerRef: React.RefObject<HTMLElement | null>
     saveStickerPositions({});
   }, []);
 
-  return { bind, getPosition, resetAll };
+  // Seeds translateRef from previously-saved positions on mount, so the
+  // hook's own source of truth agrees with what StickerField just painted
+  // to the DOM. Without this, claimDrag would read the (unseeded) map,
+  // fall back to {0,0}, and snap a restored sticker back to home the
+  // instant it's grabbed — and scheduleSave would overwrite storage with
+  // only the current session's drags, silently deleting every other
+  // sticker's saved position on the next save.
+  const hydrate = useCallback((saved: Record<string, { x: number; y: number }>) => {
+    for (const [id, p] of Object.entries(saved)) {
+      if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) {
+        translateRef.current.set(id, { x: p.x, y: p.y });
+      }
+    }
+  }, []);
+
+  return { bind, getPosition, resetAll, hydrate };
 }

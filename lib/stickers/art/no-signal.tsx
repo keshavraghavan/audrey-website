@@ -7,6 +7,7 @@ import { SCREEN_BG, SCREEN_TEXT, INK } from "../palette";
 export default function NoSignal({ className }: { className?: string }) {
   return (
     <svg viewBox={VIEWBOX} className={className} style={STICKER_SVG_STYLE}>
+      <rect x="10" y="34" width="80" height="32" rx="2" fill="none" stroke="#fff" strokeWidth="9" />
       <rect x="10" y="34" width="80" height="32" rx="2" fill={SCREEN_BG} stroke={INK} strokeWidth="2" />
       <text
         x="50"

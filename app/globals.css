@@ -60,12 +60,6 @@ textarea:focus {
   outline-offset: 1px;
 }
 
-@keyframes cd-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 @keyframes cd-blink {
   0%,
   49% {
@@ -102,13 +96,13 @@ textarea:focus {
     transform: translate(0, 0) rotate(0deg);
   }
   25% {
-    transform: translate(calc(var(--drift-amp) * 1px), calc(var(--drift-amp) * -1px)) rotate(0.6deg);
+    transform: translate(calc(var(--drift-amp) * 1px), calc(var(--drift-amp) * -1px)) rotate(calc(var(--drift-amp) * 0.6deg));
   }
   50% {
-    transform: translate(0, calc(var(--drift-amp) * -1px)) rotate(-0.6deg);
+    transform: translate(0, calc(var(--drift-amp) * -1px)) rotate(calc(var(--drift-amp) * -0.6deg));
   }
   75% {
-    transform: translate(calc(var(--drift-amp) * -1px), 0) rotate(0.4deg);
+    transform: translate(calc(var(--drift-amp) * -1px), 0) rotate(calc(var(--drift-amp) * 0.4deg));
   }
   100% {
     transform: translate(0, 0) rotate(0deg);
