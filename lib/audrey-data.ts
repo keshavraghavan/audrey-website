@@ -65,19 +65,14 @@ export const SEED_MESSAGES: GuestbookMessage[] = [
 ];
 
 export type Track = {
+  id: string;
+  spotifyId: string;
+  spotifyUri: string;
   title: string;
   artist: string;
-  by: string;
-  colors: [string, string];
+  albumArtUrl: string | null;
+  addedBy: string;
 };
-
-export const SEED_PLAYLIST: Track[] = [
-  { title: "Paper Bag", artist: "Fiona Apple", by: "Priya", colors: ["#ff8ec9", "#c800a8"] },
-  { title: "Belinda Says", artist: "Alvvays", by: "Jules", colors: ["#7de3e3", "#009a9a"] },
-  { title: "Basketball Shoes", artist: "Black Country, New Road", by: "Marcus", colors: ["#ffe680", "#ffb300"] },
-  { title: "Simulation Swarm", artist: "Big Thief", by: "Mom", colors: ["#c9a7ff", "#7a4dff"] },
-  { title: "Birthday Song", artist: "Sun Ra", by: "Dad", colors: ["#ff6a3d", "#a8330f"] },
-];
 
 // The colors here also serve as each slot's placeholder background before a
 // photo is dropped in — the slot id ("album-0", "album-1", ...) is the
@@ -97,13 +92,6 @@ export const ALBUM: AlbumPhoto[] = [
 
 export const BAR_HEIGHTS = [40, 80, 55, 100, 30, 70, 45, 90, 62, 35, 85, 50, 74, 42];
 export const BAR_COLORS = ["#ff2d95", "#ff5fb0", "#00ff9d", "#7de3e3", "#ffb300"];
-
-export const SONG_PALETTES: [string, string][] = [
-  ["#ff8ec9", "#c800a8"],
-  ["#7de3e3", "#009a9a"],
-  ["#ffe680", "#ffb300"],
-  ["#c9a7ff", "#7a4dff"],
-];
 
 export const NAME = "Audrey";
 export const AGE = 24;

@@ -6,14 +6,14 @@ import SoundsTab from "@/components/tabs/SoundsTab";
 import PhotosTab from "@/components/tabs/PhotosTab";
 import GuestbookTab from "@/components/tabs/GuestbookTab";
 import StickerField from "@/components/stickers/StickerField";
+import { addTrackToMix } from "@/app/actions";
+import type { SpotifySearchResult } from "@/lib/spotify";
 import {
   ACCENT,
   AGE,
   BIRTHDAY,
   NAME,
   SEED_MESSAGES,
-  SEED_PLAYLIST,
-  SONG_PALETTES,
   TABS,
   type GuestbookMessage,
   type Tab,
@@ -27,23 +27,22 @@ const MARQUEE_TEXT =
 type SavedState = {
   messages?: GuestbookMessage[];
   liked?: Record<string, boolean>;
-  playlist?: Track[];
 };
 
-export default function AudreySite() {
+export default function AudreySite({ initialTracks }: { initialTracks: Track[] }) {
   const [tab, setTab] = useState<Tab>("home");
   const [messages, setMessages] = useState<GuestbookMessage[]>(SEED_MESSAGES);
   const [liked, setLiked] = useState<Record<string, boolean>>({});
-  const [playlist, setPlaylist] = useState<Track[]>(SEED_PLAYLIST);
+  const [playlist, setPlaylist] = useState<Track[]>(initialTracks);
   const [hydrated, setHydrated] = useState(false);
 
   const [formName, setFormName] = useState("");
   const [formBody, setFormBody] = useState("");
   const [notice, setNotice] = useState("");
 
-  const [songTitle, setSongTitle] = useState("");
-  const [songArtist, setSongArtist] = useState("");
+  const [selectedTrack, setSelectedTrack] = useState<SpotifySearchResult | null>(null);
   const [songBy, setSongBy] = useState("");
+  const [soundsNotice, setSoundsNotice] = useState("");
 
   const [daysToGo, setDaysToGo] = useState<number | null>(null);
 
@@ -61,7 +60,6 @@ export default function AudreySite() {
       const saved: SavedState = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || "{}");
       if (saved.messages?.length) setMessages(saved.messages);
       if (saved.liked) setLiked(saved.liked);
-      if (saved.playlist?.length) setPlaylist(saved.playlist);
     } catch {
       // Corrupt or unavailable storage — carry on with the seed content.
     }
@@ -72,11 +70,11 @@ export default function AudreySite() {
   useEffect(() => {
     if (!hydrated) return;
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ messages, liked, playlist }));
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ messages, liked }));
     } catch {
       // Storage full or disabled — the session still works, it just won't persist.
     }
-  }, [messages, liked, playlist, hydrated]);
+  }, [messages, liked, hydrated]);
 
   const goTo = useCallback((t: Tab) => setTab(t), []);
   const toggleLike = useCallback((id: string) => setLiked((s) => ({ ...s, [id]: !s[id] })), []);
@@ -101,21 +99,44 @@ export default function AudreySite() {
     setNotice("Posted — she'll see it on the 20th.");
   }, [formName, formBody]);
 
-  const addSong = useCallback(() => {
-    if (!songTitle.trim()) return;
+  const addSong = useCallback(async () => {
+    if (!selectedTrack) {
+      setSoundsNotice("Pick a song from the search results first.");
+      return;
+    }
+    const addedBy = songBy.trim() || "anonymous";
+    const result = await addTrackToMix({
+      spotifyId: selectedTrack.id,
+      spotifyUri: selectedTrack.uri,
+      title: selectedTrack.title,
+      artist: selectedTrack.artist,
+      albumArtUrl: selectedTrack.albumArtUrl,
+      addedBy,
+    });
+    if (!result.ok) {
+      setSoundsNotice(result.error);
+      return;
+    }
+    if (result.duplicate) {
+      setSoundsNotice("Already on the mix!");
+      return;
+    }
     setPlaylist((p) => [
       ...p,
       {
-        title: songTitle.trim(),
-        artist: songArtist.trim() || "—",
-        by: songBy.trim() || "anonymous",
-        colors: SONG_PALETTES[p.length % SONG_PALETTES.length],
+        id: crypto.randomUUID(),
+        spotifyId: selectedTrack.id,
+        spotifyUri: selectedTrack.uri,
+        title: selectedTrack.title,
+        artist: selectedTrack.artist,
+        albumArtUrl: selectedTrack.albumArtUrl,
+        addedBy,
       },
     ]);
-    setSongTitle("");
-    setSongArtist("");
+    setSelectedTrack(null);
     setSongBy("");
-  }, [songTitle, songArtist, songBy]);
+    setSoundsNotice("Added to the mix!");
+  }, [selectedTrack, songBy]);
 
   const nameUpper = NAME.toUpperCase();
   const daysLabel =
@@ -323,12 +344,12 @@ export default function AudreySite() {
           {tab === "sounds" && (
             <SoundsTab
               playlist={playlist}
-              songTitle={songTitle}
-              songArtist={songArtist}
               songBy={songBy}
-              onSongTitleChange={setSongTitle}
-              onSongArtistChange={setSongArtist}
               onSongByChange={setSongBy}
+              selectedTrack={selectedTrack}
+              onSelectTrack={setSelectedTrack}
+              onClearSelectedTrack={() => setSelectedTrack(null)}
+              notice={soundsNotice}
               onAddSong={addSong}
             />
           )}
