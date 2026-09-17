@@ -1,4 +1,4 @@
-# AudreyWare 24.0 — real backend design
+# Real backend design
 
 **Date:** 2026-08-25
 **Status:** approved, pending implementation plan

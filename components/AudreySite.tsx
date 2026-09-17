@@ -159,7 +159,7 @@ export default function AudreySite({ initialTracks }: { initialTracks: Track[] }
           letterSpacing: "0.08em",
         }}
       >
-        <span>◆ AUDREYWARE 24.0 — birthday edition</span>
+        <span>◆ birthday edition</span>
         <span style={{ display: "flex", gap: 16, alignItems: "center" }}>
           <span>SEP·20·2026</span>
           <span
@@ -380,7 +380,7 @@ export default function AudreySite({ initialTracks }: { initialTracks: Track[] }
             letterSpacing: "0.06em",
           }}
         >
-          made by her friends · best viewed with the sound on · © 2026 audreyware
+          made by her friends · best viewed with the sound on
         </div>
       </div>
     </div>

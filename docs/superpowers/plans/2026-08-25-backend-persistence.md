@@ -1,4 +1,4 @@
-# AudreyWare 24.0 Backend Persistence — Implementation Plan
+# Backend Persistence — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -406,7 +406,7 @@ Remove `GuestbookMessage`, `MessageTint`, `SEED_MESSAGES`, `Track`, `SEED_PLAYLI
 Read the current file and remove exactly those blocks — the result should still export `Tab`, `TABS`, `Artist`, `ARTISTS`, `SONG_PALETTES`, `BAR_HEIGHTS`, `BAR_COLORS`, `NAME`, `AGE`, `ACCENT`, `BIRTHDAY`. Update the file's top comment (currently describes the localStorage behavior being removed) to:
 
 ```ts
-// Static content for the AudreyWare 24.0 birthday site — top artists are
+// Static content for the birthday site — top artists are
 // curated flavor content, not visitor input, so they stay hardcoded here.
 // Guestbook messages, the playlist, and album photos are real data now; see
 // lib/db/schema.ts and lib/db/queries.ts.

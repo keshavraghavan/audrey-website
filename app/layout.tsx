@@ -21,7 +21,7 @@ const vt323 = VT323({
 });
 
 export const metadata: Metadata = {
-  title: "AudreyWare 24.0 — Happy Birthday, Audrey!",
+  title: "Happy Birthday, Audrey!",
   description:
     "A birthday website for Audrey's 24th — sign the guestbook, add a song to her playlist, and drop a photo in the album.",
 };

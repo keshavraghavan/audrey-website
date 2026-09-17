@@ -1,4 +1,4 @@
-// Seed content for the AudreyWare 24.0 birthday site.
+// Seed content for the birthday site.
 // Guestbook messages and the playlist are persisted to localStorage once a
 // visitor adds their own — these arrays are only the starting state.
 
