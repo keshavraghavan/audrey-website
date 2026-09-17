@@ -57,9 +57,10 @@ export async function addTrackToMix(input: AddTrackInput): Promise<AddTrackResul
 const STATE_COOKIE = "spotify_oauth_state";
 
 function passphraseMatches(input: string): boolean {
-  const expected = process.env.CONNECT_PASSPHRASE ?? "";
-  const a = Buffer.from(input);
-  const b = Buffer.from(expected);
+  const expected = process.env.CONNECT_PASSPHRASE;
+  if (!expected || expected.length < 8) return false; // fail closed when unconfigured
+  const a = Buffer.from(input, "utf8");
+  const b = Buffer.from(expected, "utf8");
   if (a.length !== b.length) return false;
   return timingSafeEqual(a, b);
 }
