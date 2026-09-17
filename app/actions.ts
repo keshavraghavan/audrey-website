@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getDb, getSpotifyConnection } from "@/lib/db";
-import { tracks } from "@/lib/db/schema";
+import { tracks, spotifyConnection } from "@/lib/db/schema";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { randomBytes, timingSafeEqual } from "node:crypto";
@@ -50,8 +50,11 @@ export async function addTrackToMix(input: AddTrackInput): Promise<AddTrackResul
     try {
       const connection = await getSpotifyConnection();
       if (connection?.playlistId) {
-        const { accessToken } = await refreshAccessToken(connection.refreshToken);
+        const { accessToken, refreshToken } = await refreshAccessToken(connection.refreshToken);
         await addTracksToPlaylist(accessToken, connection.playlistId, [input.spotifyUri]);
+        if (refreshToken) {
+          await getDb().update(spotifyConnection).set({ refreshToken }).where(eq(spotifyConnection.id, connection.id));
+        }
         await getDb().update(tracks).set({ syncedAt: new Date() }).where(eq(tracks.id, inserted[0].id));
       }
     } catch (err) {
