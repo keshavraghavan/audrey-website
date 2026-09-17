@@ -3,6 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/lib/db";
 import { tracks } from "@/lib/db/schema";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { randomBytes, timingSafeEqual } from "node:crypto";
+import { getAuthorizeUrl } from "@/lib/spotify";
 
 export type AddTrackInput = {
   spotifyId: string;
@@ -48,4 +52,30 @@ export async function addTrackToMix(input: AddTrackInput): Promise<AddTrackResul
     console.error("addTrackToMix failed:", err);
     return { ok: false, error: "Couldn't save that — try again in a moment." };
   }
+}
+
+const STATE_COOKIE = "spotify_oauth_state";
+
+function passphraseMatches(input: string): boolean {
+  const expected = process.env.CONNECT_PASSPHRASE ?? "";
+  const a = Buffer.from(input);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
+export async function connectSpotify(passphrase: string): Promise<{ ok: false; error: string } | void> {
+  if (!passphraseMatches(passphrase)) {
+    return { ok: false, error: "That's not the right passphrase." };
+  }
+  const state = randomBytes(16).toString("hex");
+  const cookieStore = await cookies();
+  cookieStore.set(STATE_COOKIE, state, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 600,
+    path: "/",
+  });
+  redirect(getAuthorizeUrl(state));
 }
