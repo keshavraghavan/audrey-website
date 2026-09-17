@@ -1,7 +1,7 @@
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
 import { desc } from "drizzle-orm";
-import { tracks, spotifyConnection, type TrackRow, type SpotifyConnectionRow } from "./schema";
+import { tracks, spotifyConnection, guestbookMessages, type TrackRow, type SpotifyConnectionRow, type GuestbookMessageRow } from "./schema";
 
 let db: ReturnType<typeof drizzle> | null = null;
 
@@ -22,4 +22,8 @@ export async function getTracks(): Promise<TrackRow[]> {
 export async function getSpotifyConnection(): Promise<SpotifyConnectionRow | null> {
   const rows = await getDb().select().from(spotifyConnection).limit(1);
   return rows[0] ?? null;
+}
+
+export async function getGuestbookMessages(): Promise<GuestbookMessageRow[]> {
+  return getDb().select().from(guestbookMessages).orderBy(desc(guestbookMessages.createdAt));
 }

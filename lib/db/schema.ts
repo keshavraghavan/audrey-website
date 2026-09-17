@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, integer } from "drizzle-orm/pg-core";
 
 export const tracks = pgTable("tracks", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -28,3 +28,15 @@ export const spotifyConnection = pgTable("spotify_connection", {
 });
 
 export type SpotifyConnectionRow = typeof spotifyConnection.$inferSelect;
+
+export const guestbookMessages = pgTable("guestbook_messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  body: text("body").notNull(),
+  // 0-3 Blob URLs. The 3-photo cap is enforced in the Server Action, not here.
+  photoUrls: text("photo_urls").array().notNull().default([]),
+  likes: integer("likes").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type GuestbookMessageRow = typeof guestbookMessages.$inferSelect;
