@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "db:push": "dotenv -e .env.local -- drizzle-kit push",
-    "db:studio": "dotenv -e .env.local -- drizzle-kit studio"
+    "db:studio": "dotenv -e .env.local -- drizzle-kit studio",
+    "db:seed-guestbook": "dotenv -e .env.local -- tsx scripts/seed-guestbook.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
