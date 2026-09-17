@@ -129,7 +129,7 @@ export async function exchangeCodeForTokens(code: string): Promise<SpotifyUserTo
   return { accessToken: data.access_token, refreshToken: data.refresh_token, expiresIn: data.expires_in };
 }
 
-export async function refreshAccessToken(refreshToken: string): Promise<{ accessToken: string; expiresIn: number }> {
+export async function refreshAccessToken(refreshToken: string): Promise<{ accessToken: string; expiresIn: number; refreshToken?: string }> {
   const res = await fetch("https://accounts.spotify.com/api/token", {
     method: "POST",
     headers: {
@@ -144,8 +144,12 @@ export async function refreshAccessToken(refreshToken: string): Promise<{ access
   if (!res.ok) {
     throw new Error(`Spotify token refresh failed: ${res.status}`);
   }
-  const data = (await res.json()) as { access_token: string; expires_in: number };
-  return { accessToken: data.access_token, expiresIn: data.expires_in };
+  const data = (await res.json()) as { access_token: string; expires_in: number; refresh_token?: string };
+  return {
+    accessToken: data.access_token,
+    expiresIn: data.expires_in,
+    ...(data.refresh_token ? { refreshToken: data.refresh_token } : {}),
+  };
 }
 
 export async function getSpotifyUserId(accessToken: string): Promise<string> {
