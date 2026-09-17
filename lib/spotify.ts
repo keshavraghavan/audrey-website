@@ -163,8 +163,8 @@ export async function getSpotifyUserId(accessToken: string): Promise<string> {
   return data.id;
 }
 
-export async function createPlaylist(accessToken: string, userId: string, name: string): Promise<string> {
-  const res = await fetch(`https://api.spotify.com/v1/users/${userId}/playlists`, {
+export async function createPlaylist(accessToken: string, name: string): Promise<string> {
+  const res = await fetch("https://api.spotify.com/v1/me/playlists", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -182,7 +182,7 @@ export async function createPlaylist(accessToken: string, userId: string, name: 
 export async function addTracksToPlaylist(accessToken: string, playlistId: string, uris: string[]): Promise<void> {
   for (let i = 0; i < uris.length; i += 100) {
     const chunk = uris.slice(i, i + 100);
-    const res = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
+    const res = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/items`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${accessToken}`,

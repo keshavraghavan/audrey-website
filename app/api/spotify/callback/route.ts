@@ -21,14 +21,17 @@ export async function GET(request: NextRequest) {
 
   try {
     const tokens = await exchangeCodeForTokens(code);
-    const userId = await getSpotifyUserId(tokens.accessToken);
+    // Confirms the account is registered for this app and the token is valid
+    // before we start writing anything — a clearer failure than the create
+    // playlist error below.
+    await getSpotifyUserId(tokens.accessToken);
 
     const db = getDb();
     const existing = (await db.select().from(spotifyConnection).limit(1))[0];
 
     let playlistId = existing?.playlistId ?? null;
     if (!playlistId) {
-      playlistId = await createPlaylist(tokens.accessToken, userId, `${NAME}'s Birthday Mix`);
+      playlistId = await createPlaylist(tokens.accessToken, `${NAME}'s Birthday Mix`);
     }
 
     if (existing) {
