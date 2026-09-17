@@ -1,12 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getDb } from "@/lib/db";
+import { getDb, getSpotifyConnection } from "@/lib/db";
 import { tracks } from "@/lib/db/schema";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { randomBytes, timingSafeEqual } from "node:crypto";
-import { getAuthorizeUrl } from "@/lib/spotify";
+import { getAuthorizeUrl, refreshAccessToken, addTracksToPlaylist } from "@/lib/spotify";
+import { eq } from "drizzle-orm";
 
 export type AddTrackInput = {
   spotifyId: string;
@@ -44,6 +45,20 @@ export async function addTrackToMix(input: AddTrackInput): Promise<AddTrackResul
 
     if (inserted.length === 0) {
       return { ok: true, duplicate: true };
+    }
+
+    const connection = await getSpotifyConnection();
+    if (connection?.playlistId) {
+      try {
+        const { accessToken } = await refreshAccessToken(connection.refreshToken);
+        await addTracksToPlaylist(accessToken, connection.playlistId, [input.spotifyUri]);
+        await getDb().update(tracks).set({ syncedAt: new Date() }).where(eq(tracks.id, inserted[0].id));
+      } catch (err) {
+        // Non-blocking: the track is already safely saved locally even if
+        // the live push to her real playlist fails (revoked token, Spotify
+        // outage, etc.) — logged only, never surfaced to the visitor.
+        console.error("Live sync to Spotify playlist failed:", err);
+      }
     }
 
     revalidatePath("/");
