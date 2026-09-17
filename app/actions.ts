@@ -47,18 +47,18 @@ export async function addTrackToMix(input: AddTrackInput): Promise<AddTrackResul
       return { ok: true, duplicate: true };
     }
 
-    const connection = await getSpotifyConnection();
-    if (connection?.playlistId) {
-      try {
+    try {
+      const connection = await getSpotifyConnection();
+      if (connection?.playlistId) {
         const { accessToken } = await refreshAccessToken(connection.refreshToken);
         await addTracksToPlaylist(accessToken, connection.playlistId, [input.spotifyUri]);
         await getDb().update(tracks).set({ syncedAt: new Date() }).where(eq(tracks.id, inserted[0].id));
-      } catch (err) {
-        // Non-blocking: the track is already safely saved locally even if
-        // the live push to her real playlist fails (revoked token, Spotify
-        // outage, etc.) — logged only, never surfaced to the visitor.
-        console.error("Live sync to Spotify playlist failed:", err);
       }
+    } catch (err) {
+      // Non-blocking: the track is already safely saved locally even if
+      // the live push to her real playlist fails (revoked token, Spotify
+      // outage, Neon connection error, etc.) — logged only, never surfaced to the visitor.
+      console.error("Live sync to Spotify playlist failed:", err);
     }
 
     revalidatePath("/");
