@@ -13,6 +13,37 @@ export const TABS: { key: Tab; label: string }[] = [
 
 export type MessageTint = "pink" | "teal" | "gold";
 
+const TINTS: MessageTint[] = ["pink", "teal", "gold"];
+
+const SWATCHES: Record<MessageTint, string> = {
+  pink: "linear-gradient(135deg, #ff8ec9, #d6006e)",
+  teal: "linear-gradient(135deg, #7de3e3, #009a9a)",
+  gold: "linear-gradient(135deg, #ffe680, #ffb300)",
+};
+
+// Real messages have no UI field for picking a color, so the tint is a
+// deterministic hash of the message id — stable across reloads without
+// storing it.
+function deriveTint(id: string): MessageTint {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  }
+  return TINTS[hash % TINTS.length];
+}
+
+function formatTimeAgo(date: Date): string {
+  const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "yesterday";
+  return `${days} days ago`;
+}
+
 export type GuestbookMessage = {
   id: string;
   name: string;
@@ -21,48 +52,31 @@ export type GuestbookMessage = {
   tint: MessageTint;
   likes: number;
   body: string;
-  photos?: boolean;
+  photoUrls: string[];
 };
 
-export const SEED_MESSAGES: GuestbookMessage[] = [
-  {
-    id: "s1",
-    name: "Priya",
-    meta: "roommate · 2 hours ago",
-    swatch: "linear-gradient(135deg, #ff8ec9, #d6006e)",
-    tint: "pink",
-    likes: 7,
-    body: 'First memory: you at the kitchen table at 1am, three books open, telling me you were "almost done." You were on page nine of all three. Happiest birthday, my favorite over-committer.',
-  },
-  {
-    id: "s2",
-    name: "Dad",
-    meta: "yesterday",
-    swatch: "linear-gradient(135deg, #7de3e3, #009a9a)",
-    tint: "teal",
-    likes: 12,
-    photos: true,
-    body: "Twenty-four years ago you arrived two weeks late, already on your own schedule. Nothing has changed. We love you.",
-  },
-  {
-    id: "s3",
-    name: "Marcus",
-    meta: "book club · 2 days ago",
-    swatch: "linear-gradient(135deg, #ffe680, #ffb300)",
-    tint: "gold",
-    likes: 5,
-    body: "You have never once let us pick the book and honestly the record speaks for itself. 24 looks good on you.",
-  },
-  {
-    id: "s4",
-    name: "Jules",
-    meta: "since freshman year · 3 days ago",
-    swatch: "linear-gradient(135deg, #c9a7ff, #7a4dff)",
-    tint: "pink",
-    likes: 9,
-    body: "First time I met you, you asked what I was reading before you asked my name. Still the best introduction I've ever gotten.",
-  },
-];
+type GuestbookMessageSource = {
+  id: string;
+  name: string;
+  body: string;
+  photoUrls: string[];
+  likes: number;
+  createdAt: Date;
+};
+
+export function toGuestbookMessage(row: GuestbookMessageSource): GuestbookMessage {
+  const tint = deriveTint(row.id);
+  return {
+    id: row.id,
+    name: row.name,
+    body: row.body,
+    photoUrls: row.photoUrls,
+    likes: row.likes,
+    tint,
+    swatch: SWATCHES[tint],
+    meta: formatTimeAgo(row.createdAt),
+  };
+}
 
 export type Track = {
   id: string;

@@ -6,14 +6,14 @@ import SoundsTab from "@/components/tabs/SoundsTab";
 import PhotosTab from "@/components/tabs/PhotosTab";
 import GuestbookTab from "@/components/tabs/GuestbookTab";
 import StickerField from "@/components/stickers/StickerField";
-import { addTrackToMix } from "@/app/actions";
+import { upload } from "@vercel/blob/client";
+import { addTrackToMix, postGuestbookMessage, toggleGuestbookLike } from "@/app/actions";
 import type { SpotifySearchResult } from "@/lib/spotify";
 import {
   ACCENT,
   AGE,
   BIRTHDAY,
   NAME,
-  SEED_MESSAGES,
   TABS,
   type GuestbookMessage,
   type Tab,
@@ -25,13 +25,18 @@ const MARQUEE_TEXT =
   "✿ sign the guestbook ✿ add a song to her playlist ✿ drop a photo in the album ✿ tell us your first memory of her ✿ ";
 
 type SavedState = {
-  messages?: GuestbookMessage[];
   liked?: Record<string, boolean>;
 };
 
-export default function AudreySite({ initialTracks }: { initialTracks: Track[] }) {
+export default function AudreySite({
+  initialTracks,
+  initialMessages,
+}: {
+  initialTracks: Track[];
+  initialMessages: GuestbookMessage[];
+}) {
   const [tab, setTab] = useState<Tab>("home");
-  const [messages, setMessages] = useState<GuestbookMessage[]>(SEED_MESSAGES);
+  const [messages, setMessages] = useState<GuestbookMessage[]>(initialMessages);
   const [liked, setLiked] = useState<Record<string, boolean>>({});
   const [playlist, setPlaylist] = useState<Track[]>(initialTracks);
   const [hydrated, setHydrated] = useState(false);
@@ -39,6 +44,8 @@ export default function AudreySite({ initialTracks }: { initialTracks: Track[] }
   const [formName, setFormName] = useState("");
   const [formBody, setFormBody] = useState("");
   const [notice, setNotice] = useState("");
+  const [pendingPhotoUrls, setPendingPhotoUrls] = useState<string[]>([]);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
 
   const [selectedTrack, setSelectedTrack] = useState<SpotifySearchResult | null>(null);
   const [songBy, setSongBy] = useState("");
@@ -58,7 +65,6 @@ export default function AudreySite({ initialTracks }: { initialTracks: Track[] }
     setDaysToGo(Math.max(0, Math.ceil((BIRTHDAY.getTime() - Date.now()) / 86400000)));
     try {
       const saved: SavedState = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || "{}");
-      if (saved.messages?.length) setMessages(saved.messages);
       if (saved.liked) setLiked(saved.liked);
     } catch {
       // Corrupt or unavailable storage — carry on with the seed content.
@@ -70,34 +76,67 @@ export default function AudreySite({ initialTracks }: { initialTracks: Track[] }
   useEffect(() => {
     if (!hydrated) return;
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ messages, liked }));
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ liked }));
     } catch {
       // Storage full or disabled — the session still works, it just won't persist.
     }
-  }, [messages, liked, hydrated]);
+  }, [liked, hydrated]);
 
   const goTo = useCallback((t: Tab) => setTab(t), []);
-  const toggleLike = useCallback((id: string) => setLiked((s) => ({ ...s, [id]: !s[id] })), []);
 
-  const postMessage = useCallback(() => {
+  const toggleLike = useCallback(
+    (id: string) => {
+      const nextLiked = !liked[id];
+      setLiked((s) => ({ ...s, [id]: nextLiked }));
+      setMessages((msgs) => msgs.map((m) => (m.id === id ? { ...m, likes: m.likes + (nextLiked ? 1 : -1) } : m)));
+      toggleGuestbookLike(id, nextLiked).catch((err) => console.error("toggleGuestbookLike failed:", err));
+    },
+    [liked],
+  );
+
+  const addPendingPhotos = useCallback(
+    async (files: FileList) => {
+      const remaining = 3 - pendingPhotoUrls.length;
+      if (remaining <= 0) return;
+      const toUpload = Array.from(files).slice(0, remaining);
+      setUploadingPhotos(true);
+      const uploaded: string[] = [];
+      for (const file of toUpload) {
+        try {
+          const blob = await upload(file.name, file, { access: "public", handleUploadUrl: "/api/blob/upload" });
+          uploaded.push(blob.url);
+        } catch (err) {
+          // Partial-failure decision: drop the one that failed, keep going —
+          // never blocks the post over one bad photo.
+          console.error("Photo upload failed:", err);
+        }
+      }
+      setPendingPhotoUrls((urls) => [...urls, ...uploaded]);
+      setUploadingPhotos(false);
+    },
+    [pendingPhotoUrls.length],
+  );
+
+  const postMessage = useCallback(async () => {
     if (!formName.trim() || !formBody.trim()) {
       setNotice("Need a name and a note before we can post it.");
       return;
     }
-    const msg: GuestbookMessage = {
-      id: "u" + Date.now(),
+    const result = await postGuestbookMessage({
       name: formName.trim(),
-      meta: "just now",
-      swatch: "linear-gradient(135deg, #ff8ec9, #d6006e)",
-      tint: "pink",
-      likes: 0,
       body: formBody.trim(),
-    };
-    setMessages((m) => [msg, ...m]);
+      photoUrls: pendingPhotoUrls,
+    });
+    if (!result.ok) {
+      setNotice(result.error);
+      return;
+    }
+    setMessages((m) => [result.message, ...m]);
     setFormName("");
     setFormBody("");
+    setPendingPhotoUrls([]);
     setNotice("Posted — she'll see it on the 20th.");
-  }, [formName, formBody]);
+  }, [formName, formBody, pendingPhotoUrls]);
 
   const addSong = useCallback(async () => {
     if (!selectedTrack) {
@@ -365,6 +404,9 @@ export default function AudreySite({ initialTracks }: { initialTracks: Track[] }
               onFormBodyChange={setFormBody}
               notice={notice}
               onPostMessage={postMessage}
+              photoUrls={pendingPhotoUrls}
+              uploadingPhotos={uploadingPhotos}
+              onAddPhotos={addPendingPhotos}
             />
           )}
         </div>

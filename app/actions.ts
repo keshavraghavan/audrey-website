@@ -2,12 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { getDb, getSpotifyConnection } from "@/lib/db";
-import { tracks, spotifyConnection } from "@/lib/db/schema";
+import { tracks, spotifyConnection, guestbookMessages } from "@/lib/db/schema";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { getAuthorizeUrl, refreshAccessToken, addTracksToPlaylist } from "@/lib/spotify";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
+import { toGuestbookMessage, type GuestbookMessage } from "@/lib/audrey-data";
 
 export type AddTrackInput = {
   spotifyId: string;
@@ -97,4 +98,44 @@ export async function connectSpotify(passphrase: string): Promise<{ ok: false; e
     path: "/",
   });
   redirect(getAuthorizeUrl(state));
+}
+
+export type PostGuestbookMessageInput = {
+  name: string;
+  body: string;
+  photoUrls: string[];
+};
+
+export type PostGuestbookMessageResult = { ok: true; message: GuestbookMessage } | { ok: false; error: string };
+
+export async function postGuestbookMessage(input: PostGuestbookMessageInput): Promise<PostGuestbookMessageResult> {
+  const name = input.name.trim();
+  const body = input.body.trim();
+  if (!name || !body) {
+    return { ok: false, error: "Need a name and a note before we can post it." };
+  }
+
+  try {
+    const [row] = await getDb()
+      .insert(guestbookMessages)
+      .values({ name, body, photoUrls: input.photoUrls.slice(0, 3) })
+      .returning();
+    revalidatePath("/");
+    return { ok: true, message: toGuestbookMessage(row) };
+  } catch (err) {
+    console.error("postGuestbookMessage failed:", err);
+    return { ok: false, error: "Couldn't post that — try again in a moment." };
+  }
+}
+
+export async function toggleGuestbookLike(id: string, liked: boolean): Promise<void> {
+  try {
+    await getDb()
+      .update(guestbookMessages)
+      .set({ likes: sql`${guestbookMessages.likes} + ${liked ? 1 : -1}` })
+      .where(eq(guestbookMessages.id, id));
+    revalidatePath("/");
+  } catch (err) {
+    console.error("toggleGuestbookLike failed:", err);
+  }
 }

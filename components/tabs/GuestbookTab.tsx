@@ -1,4 +1,3 @@
-import PhotoSlot from "@/components/PhotoSlot";
 import type { GuestbookMessage, MessageTint } from "@/lib/audrey-data";
 
 function tintStyle(tint: MessageTint) {
@@ -31,6 +30,9 @@ export default function GuestbookTab({
   onFormBodyChange,
   notice,
   onPostMessage,
+  photoUrls,
+  uploadingPhotos,
+  onAddPhotos,
 }: {
   messages: GuestbookMessage[];
   liked: Record<string, boolean>;
@@ -41,6 +43,9 @@ export default function GuestbookTab({
   onFormBodyChange: (value: string) => void;
   notice: string;
   onPostMessage: () => void;
+  photoUrls: string[];
+  uploadingPhotos: boolean;
+  onAddPhotos: (files: FileList) => void;
 }) {
   return (
     <div
@@ -75,14 +80,12 @@ export default function GuestbookTab({
                 <p style={{ margin: "11px 0 0", fontSize: 14, lineHeight: 1.8, color: "#4a3341", textWrap: "pretty" }}>
                   {m.body}
                 </p>
-                {m.photos && (
+                {m.photoUrls.length > 0 && (
                   <div style={{ marginTop: 12, display: "flex", gap: 9 }}>
-                    <div style={{ width: 104, height: 78, borderRadius: 8, background: "#cdf3f3", overflow: "hidden" }}>
-                      <PhotoSlot id="dad-1" background="#cdf3f3" radius={8} placeholder="photo" />
-                    </div>
-                    <div style={{ width: 104, height: 78, borderRadius: 8, background: "#ffd9ec", overflow: "hidden" }}>
-                      <PhotoSlot id="dad-2" background="#ffd9ec" radius={8} placeholder="photo" />
-                    </div>
+                    {m.photoUrls.map((url) => (
+                      // eslint-disable-next-line @next/next/no-img-element -- visitor-uploaded Blob URLs, not a next/image-optimizable local/remote-pattern asset for this pass
+                      <img key={url} src={url} alt="" style={{ width: 104, height: 78, borderRadius: 8, objectFit: "cover" }} />
+                    ))}
                   </div>
                 )}
                 <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 10 }}>
@@ -144,7 +147,7 @@ export default function GuestbookTab({
             resize: "vertical",
           }}
         />
-        <div
+        <label
           style={{
             borderRadius: 10,
             border: "2px dashed #eeb0cf",
@@ -154,11 +157,32 @@ export default function GuestbookTab({
             fontSize: 11,
             fontWeight: 700,
             color: "var(--accent-dark)",
-            cursor: "pointer",
+            cursor: photoUrls.length >= 3 || uploadingPhotos ? "default" : "pointer",
+            opacity: photoUrls.length >= 3 ? 0.6 : 1,
+            display: "block",
           }}
         >
-          + ADD PHOTOS (3 MAX)
-        </div>
+          {uploadingPhotos ? "UPLOADING…" : photoUrls.length >= 3 ? "3 PHOTOS ATTACHED" : "+ ADD PHOTOS (3 MAX)"}
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            disabled={photoUrls.length >= 3 || uploadingPhotos}
+            onChange={(e) => {
+              if (e.target.files && e.target.files.length > 0) onAddPhotos(e.target.files);
+              e.target.value = "";
+            }}
+            style={{ display: "none" }}
+          />
+        </label>
+        {photoUrls.length > 0 && (
+          <div style={{ display: "flex", gap: 8 }}>
+            {photoUrls.map((url) => (
+              // eslint-disable-next-line @next/next/no-img-element -- visitor-uploaded Blob URLs, not a next/image-optimizable local/remote-pattern asset for this pass
+              <img key={url} src={url} alt="" style={{ width: 48, height: 48, borderRadius: 6, objectFit: "cover" }} />
+            ))}
+          </div>
+        )}
         <button
           onClick={onPostMessage}
           style={{
