@@ -8,15 +8,20 @@ export async function POST(request: Request): Promise<NextResponse> {
     const jsonResponse = await handleUpload({
       body,
       request,
-      onBeforeGenerateToken: async () => ({
-        allowedContentTypes: ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"],
-        maximumSizeInBytes: 15 * 1024 * 1024, // phone-camera photos
-        addRandomSuffix: true,
-      }),
+      onBeforeGenerateToken: async (pathname) => {
+        if (!/^[\w.-]+$/.test(pathname)) {
+          throw new Error("Invalid pathname");
+        }
+        return {
+          allowedContentTypes: ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"],
+          maximumSizeInBytes: 15 * 1024 * 1024, // phone-camera photos
+          addRandomSuffix: true,
+        };
+      },
     });
     return NextResponse.json(jsonResponse);
   } catch (err) {
     console.error("Blob upload token generation failed:", err);
-    return NextResponse.json({ error: (err as Error).message }, { status: 400 });
+    return NextResponse.json({ error: "Could not authorize upload" }, { status: 400 });
   }
 }

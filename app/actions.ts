@@ -10,6 +10,15 @@ import { getAuthorizeUrl, refreshAccessToken, addTracksToPlaylist } from "@/lib/
 import { eq, sql } from "drizzle-orm";
 import { toGuestbookMessage, type GuestbookMessage } from "@/lib/audrey-data";
 
+function isAllowedPhotoUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" && parsed.hostname.endsWith(".public.blob.vercel-storage.com");
+  } catch {
+    return false;
+  }
+}
+
 export type AddTrackInput = {
   spotifyId: string;
   spotifyUri: string;
@@ -114,11 +123,15 @@ export async function postGuestbookMessage(input: PostGuestbookMessageInput): Pr
   if (!name || !body) {
     return { ok: false, error: "Need a name and a note before we can post it." };
   }
+  if (name.length > 100 || body.length > 2000) {
+    return { ok: false, error: "That's a bit long — try trimming it down." };
+  }
 
   try {
+    const photoUrls = input.photoUrls.slice(0, 3).filter(isAllowedPhotoUrl);
     const [row] = await getDb()
       .insert(guestbookMessages)
-      .values({ name, body, photoUrls: input.photoUrls.slice(0, 3) })
+      .values({ name, body, photoUrls })
       .returning();
     revalidatePath("/");
     return { ok: true, message: toGuestbookMessage(row) };

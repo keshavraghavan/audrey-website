@@ -84,7 +84,7 @@ export default function GuestbookTab({
                   <div style={{ marginTop: 12, display: "flex", gap: 9 }}>
                     {m.photoUrls.map((url) => (
                       // eslint-disable-next-line @next/next/no-img-element -- visitor-uploaded Blob URLs, not a next/image-optimizable local/remote-pattern asset for this pass
-                      <img key={url} src={url} alt="" style={{ width: 104, height: 78, borderRadius: 8, objectFit: "cover" }} />
+                      <img key={url} src={url} alt="" referrerPolicy="no-referrer" style={{ width: 104, height: 78, borderRadius: 8, objectFit: "cover" }} />
                     ))}
                   </div>
                 )}
@@ -179,7 +179,7 @@ export default function GuestbookTab({
           <div style={{ display: "flex", gap: 8 }}>
             {photoUrls.map((url) => (
               // eslint-disable-next-line @next/next/no-img-element -- visitor-uploaded Blob URLs, not a next/image-optimizable local/remote-pattern asset for this pass
-              <img key={url} src={url} alt="" style={{ width: 48, height: 48, borderRadius: 6, objectFit: "cover" }} />
+              <img key={url} src={url} alt="" referrerPolicy="no-referrer" style={{ width: 48, height: 48, borderRadius: 6, objectFit: "cover" }} />
             ))}
           </div>
         )}
