@@ -207,7 +207,11 @@ export default function AudreySite({
     ]);
     setSelectedTrack(null);
     setSongBy("");
-    setSoundsNotice("Added to the mix!");
+    setSoundsNotice(
+      result.playlistSyncFailed
+        ? "Added to the mix! (It'll reach the Spotify playlist next time it's reconnected.)"
+        : "Added to the mix!",
+    );
   }, [selectedTrack, songBy]);
 
   const nameUpper = NAME.toUpperCase();
