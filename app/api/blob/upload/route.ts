@@ -9,7 +9,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       body,
       request,
       onBeforeGenerateToken: async (pathname) => {
-        if (!/^[\w.-]+$/.test(pathname)) {
+        if (pathname.includes("/") || pathname.includes("\\") || pathname.startsWith(".") || pathname.length > 200) {
           throw new Error("Invalid pathname");
         }
         return {

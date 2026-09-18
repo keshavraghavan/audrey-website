@@ -112,6 +112,10 @@ export default function AudreySite({
         }
       }
       setPendingPhotoUrls((urls) => [...urls, ...uploaded]);
+      if (uploaded.length < toUpload.length) {
+        const failedCount = toUpload.length - uploaded.length;
+        setNotice(`Couldn't add ${failedCount} photo${failedCount === 1 ? "" : "s"} — try a different file.`);
+      }
       setUploadingPhotos(false);
     },
     [pendingPhotoUrls.length],

@@ -2,6 +2,8 @@ import AudreySite from "@/components/AudreySite";
 import { getTracks, getGuestbookMessages } from "@/lib/db";
 import { toGuestbookMessage, type GuestbookMessage } from "@/lib/audrey-data";
 
+export const dynamic = "force-dynamic";
+
 export default async function Page() {
   let tracks: Awaited<ReturnType<typeof getTracks>> = [];
   try {
