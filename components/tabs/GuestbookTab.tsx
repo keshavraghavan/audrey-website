@@ -68,7 +68,7 @@ export default function GuestbookTab({
         <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 12 }}>
           {messages.map((m) => {
             const isLiked = !!liked[m.id];
-            const likeCount = m.likes + (isLiked ? 1 : 0);
+            const likeCount = m.likes;
             return (
               <div key={m.id} style={{ borderRadius: 12, padding: "18px 20px", ...tintStyle(m.tint) }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
