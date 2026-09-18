@@ -17,6 +17,25 @@ const inputStyle = {
   boxSizing: "border-box" as const,
 };
 
+// Carries the route's error code so the notice can tell a problem that will
+// clear on its own apart from one that won't. `permanent` failures are config
+// problems on our side — telling a visitor to try again just wastes their time.
+class SearchFailure extends Error {
+  constructor(readonly permanent: boolean) {
+    super("search failed");
+    this.name = "SearchFailure";
+  }
+}
+
+async function runSearch(query: string, signal: AbortSignal): Promise<SpotifySearchResult[]> {
+  const res = await fetch(`/api/spotify/search?q=${encodeURIComponent(query)}`, { signal });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new SearchFailure(body?.error === "not_configured" || body?.error === "spotify_auth_rejected");
+  }
+  return (await res.json()) as SpotifySearchResult[];
+}
+
 function SongSearch({
   selectedTrack,
   onSelectTrack,
@@ -43,11 +62,7 @@ function SongSearch({
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
-      fetch(`/api/spotify/search?q=${encodeURIComponent(query)}`, { signal: controller.signal })
-        .then((res) => {
-          if (!res.ok) throw new Error("search failed");
-          return res.json() as Promise<SpotifySearchResult[]>;
-        })
+      runSearch(query, controller.signal)
         .then((data) => {
           setResults(data);
           setSearchError("");
@@ -55,7 +70,11 @@ function SongSearch({
         .catch((err: unknown) => {
           if (err instanceof DOMException && err.name === "AbortError") return;
           setResults([]);
-          setSearchError("Couldn't search right now — try again in a moment.");
+          setSearchError(
+            err instanceof SearchFailure && err.permanent
+              ? "Song search isn't set up right now — everything else on the site still works."
+              : "Couldn't search right now — try again in a moment.",
+          );
         });
     }, 300);
     return () => clearTimeout(timer);

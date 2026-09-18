@@ -30,7 +30,9 @@ export type AddTrackInput = {
   addedBy: string;
 };
 
-export type AddTrackResult = { ok: true; duplicate?: boolean } | { ok: false; error: string };
+export type AddTrackResult =
+  | { ok: true; duplicate?: boolean; playlistSyncFailed?: boolean }
+  | { ok: false; error: string };
 
 export async function addTrackToMix(input: AddTrackInput): Promise<AddTrackResult> {
   const addedBy = input.addedBy.trim();
@@ -59,6 +61,7 @@ export async function addTrackToMix(input: AddTrackInput): Promise<AddTrackResul
       return { ok: true, duplicate: true };
     }
 
+    let playlistSyncFailed = false;
     try {
       const connection = await getSpotifyConnection();
       if (connection?.playlistId) {
@@ -70,14 +73,16 @@ export async function addTrackToMix(input: AddTrackInput): Promise<AddTrackResul
         await getDb().update(tracks).set({ syncedAt: new Date() }).where(eq(tracks.id, inserted[0].id));
       }
     } catch (err) {
-      // Non-blocking: the track is already safely saved locally even if
-      // the live push to her real playlist fails (revoked token, Spotify
-      // outage, Neon connection error, etc.) — logged only, never surfaced to the visitor.
+      // Still non-blocking — the track is safely saved either way (revoked
+      // token, Spotify outage, Neon connection error). But no longer silent:
+      // swallowing this entirely is how a broken playlist endpoint went
+      // unnoticed. syncedAt stays null, so the next connect backfills it.
       console.error("Live sync to Spotify playlist failed:", err);
+      playlistSyncFailed = true;
     }
 
     revalidatePath("/");
-    return { ok: true };
+    return playlistSyncFailed ? { ok: true, playlistSyncFailed: true } : { ok: true };
   } catch (err) {
     console.error("addTrackToMix failed:", err);
     return { ok: false, error: "Couldn't save that — try again in a moment." };
