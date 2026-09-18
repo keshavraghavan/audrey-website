@@ -8,7 +8,7 @@ export const TABS: { key: Tab; label: string }[] = [
   { key: "home", label: "Home" },
   { key: "guestbook", label: "Guestbook" },
   { key: "sounds", label: "Her sounds" },
-  { key: "photos", label: "The album" },
+  { key: "photos", label: "Album photos" },
 ];
 
 export type MessageTint = "pink" | "teal" | "gold";
@@ -88,21 +88,13 @@ export type Track = {
   addedBy: string;
 };
 
-// The colors here also serve as each slot's placeholder background before a
-// photo is dropped in — the slot id ("album-0", "album-1", ...) is the
-// localStorage key, shared between the home-page preview tiles and the full
-// album grid so a dropped photo shows up in both places.
-export type AlbumPhoto = { caption: string; color: string };
+export type AlbumPhoto = { id: string; url: string };
 
-export const ALBUM: AlbumPhoto[] = [
-  { caption: "the lake, july", color: "#cdf3f3" },
-  { caption: "book club, march", color: "#ffd9ec" },
-  { caption: "her 23rd", color: "#fff0c2" },
-  { caption: "graduation", color: "#e6dcff" },
-  { caption: "kitchen table, 1am", color: "#ffe0d6" },
-  { caption: "the bookstore trip", color: "#d9f2e4" },
-  { caption: "halloween '24", color: "#ffd9ec" },
-];
+type AlbumPhotoSource = { id: string; url: string };
+
+export function toAlbumPhoto(row: AlbumPhotoSource): AlbumPhoto {
+  return { id: row.id, url: row.url };
+}
 
 export const BAR_HEIGHTS = [40, 80, 55, 100, 30, 70, 45, 90, 62, 35, 85, 50, 74, 42];
 export const BAR_COLORS = ["#ff2d95", "#ff5fb0", "#00ff9d", "#7de3e3", "#ffb300"];

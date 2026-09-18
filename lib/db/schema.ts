@@ -40,3 +40,11 @@ export const guestbookMessages = pgTable("guestbook_messages", {
 });
 
 export type GuestbookMessageRow = typeof guestbookMessages.$inferSelect;
+
+export const albumPhotos = pgTable("album_photos", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  url: text("url").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type AlbumPhotoRow = typeof albumPhotos.$inferSelect;

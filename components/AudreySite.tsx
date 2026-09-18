@@ -7,7 +7,7 @@ import PhotosTab from "@/components/tabs/PhotosTab";
 import GuestbookTab from "@/components/tabs/GuestbookTab";
 import StickerField from "@/components/stickers/StickerField";
 import { upload } from "@vercel/blob/client";
-import { addTrackToMix, postGuestbookMessage, toggleGuestbookLike } from "@/app/actions";
+import { addTrackToMix, postGuestbookMessage, toggleGuestbookLike, addAlbumPhoto } from "@/app/actions";
 import type { SpotifySearchResult } from "@/lib/spotify";
 import {
   ACCENT,
@@ -15,6 +15,7 @@ import {
   BIRTHDAY,
   NAME,
   TABS,
+  type AlbumPhoto,
   type GuestbookMessage,
   type Tab,
   type Track,
@@ -31,14 +32,19 @@ type SavedState = {
 export default function AudreySite({
   initialTracks,
   initialMessages,
+  initialPhotos,
 }: {
   initialTracks: Track[];
   initialMessages: GuestbookMessage[];
+  initialPhotos: AlbumPhoto[];
 }) {
   const [tab, setTab] = useState<Tab>("home");
   const [messages, setMessages] = useState<GuestbookMessage[]>(initialMessages);
   const [liked, setLiked] = useState<Record<string, boolean>>({});
   const [playlist, setPlaylist] = useState<Track[]>(initialTracks);
+  const [photos, setPhotos] = useState<AlbumPhoto[]>(initialPhotos);
+  const [uploadingAlbumPhotos, setUploadingAlbumPhotos] = useState(false);
+  const [albumNotice, setAlbumNotice] = useState("");
   const [hydrated, setHydrated] = useState(false);
 
   const [formName, setFormName] = useState("");
@@ -121,6 +127,29 @@ export default function AudreySite({
     [pendingPhotoUrls.length],
   );
 
+  const addAlbumPhotos = useCallback(async (files: FileList) => {
+    const toUpload = Array.from(files).slice(0, 10);
+    if (toUpload.length === 0) return;
+    setUploadingAlbumPhotos(true);
+    let failedCount = 0;
+    for (const file of toUpload) {
+      try {
+        const blob = await upload(file.name, file, { access: "public", handleUploadUrl: "/api/blob/upload" });
+        const result = await addAlbumPhoto(blob.url);
+        if (result.ok) {
+          setPhotos((p) => [result.photo, ...p]);
+        } else {
+          failedCount += 1;
+        }
+      } catch (err) {
+        console.error("Album photo upload failed:", err);
+        failedCount += 1;
+      }
+    }
+    setAlbumNotice(failedCount > 0 ? `Couldn't add ${failedCount} photo${failedCount === 1 ? "" : "s"} — try again.` : "");
+    setUploadingAlbumPhotos(false);
+  }, []);
+
   const postMessage = useCallback(async () => {
     if (!formName.trim() || !formBody.trim()) {
       setNotice("Need a name and a note before we can post it.");
@@ -165,7 +194,6 @@ export default function AudreySite({
       return;
     }
     setPlaylist((p) => [
-      ...p,
       {
         id: crypto.randomUUID(),
         spotifyId: selectedTrack.id,
@@ -175,6 +203,7 @@ export default function AudreySite({
         albumArtUrl: selectedTrack.albumArtUrl,
         addedBy,
       },
+      ...p,
     ]);
     setSelectedTrack(null);
     setSongBy("");
@@ -380,8 +409,11 @@ export default function AudreySite({
           {tab === "home" && (
             <HomeTab
               messages={messages}
+              playlist={playlist}
+              photos={photos}
               onGoGuestbook={() => goTo("guestbook")}
               onGoPhotos={() => goTo("photos")}
+              onGoSounds={() => goTo("sounds")}
             />
           )}
           {tab === "sounds" && (
@@ -396,7 +428,14 @@ export default function AudreySite({
               onAddSong={addSong}
             />
           )}
-          {tab === "photos" && <PhotosTab />}
+          {tab === "photos" && (
+            <PhotosTab
+              photos={photos}
+              uploading={uploadingAlbumPhotos}
+              notice={albumNotice}
+              onAddPhotos={addAlbumPhotos}
+            />
+          )}
           {tab === "guestbook" && (
             <GuestbookTab
               messages={messages}

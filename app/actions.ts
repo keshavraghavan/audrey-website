@@ -2,13 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { getDb, getSpotifyConnection } from "@/lib/db";
-import { tracks, spotifyConnection, guestbookMessages } from "@/lib/db/schema";
+import { tracks, spotifyConnection, guestbookMessages, albumPhotos } from "@/lib/db/schema";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { getAuthorizeUrl, refreshAccessToken, addTracksToPlaylist } from "@/lib/spotify";
 import { eq, sql } from "drizzle-orm";
-import { toGuestbookMessage, type GuestbookMessage } from "@/lib/audrey-data";
+import { toGuestbookMessage, toAlbumPhoto, type GuestbookMessage, type AlbumPhoto } from "@/lib/audrey-data";
 
 const ALLOWED_BLOB_HOSTNAME = "9dg6oaslwkgdoppo.public.blob.vercel-storage.com";
 
@@ -140,6 +140,22 @@ export async function postGuestbookMessage(input: PostGuestbookMessageInput): Pr
   } catch (err) {
     console.error("postGuestbookMessage failed:", err);
     return { ok: false, error: "Couldn't post that — try again in a moment." };
+  }
+}
+
+export type AddAlbumPhotoResult = { ok: true; photo: AlbumPhoto } | { ok: false; error: string };
+
+export async function addAlbumPhoto(url: string): Promise<AddAlbumPhotoResult> {
+  if (!isAllowedPhotoUrl(url)) {
+    return { ok: false, error: "That photo didn't upload right — try again." };
+  }
+  try {
+    const [row] = await getDb().insert(albumPhotos).values({ url }).returning();
+    revalidatePath("/");
+    return { ok: true, photo: toAlbumPhoto(row) };
+  } catch (err) {
+    console.error("addAlbumPhoto failed:", err);
+    return { ok: false, error: "Couldn't save that — try again in a moment." };
   }
 }
 

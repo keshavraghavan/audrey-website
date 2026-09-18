@@ -1,6 +1,5 @@
 import type { CSSProperties } from "react";
-import PhotoSlot from "@/components/PhotoSlot";
-import { ALBUM, BAR_COLORS, BAR_HEIGHTS, type GuestbookMessage } from "@/lib/audrey-data";
+import { type AlbumPhoto, type GuestbookMessage, type Track } from "@/lib/audrey-data";
 
 // Always shown, even when the two columns stack on a narrow screen.
 const PINNED_MESSAGES = 2;
@@ -33,14 +32,21 @@ function MessageCard({ message, style }: { message: GuestbookMessage; style?: CS
 
 export default function HomeTab({
   messages,
+  playlist,
+  photos,
   onGoGuestbook,
   onGoPhotos,
+  onGoSounds,
 }: {
   messages: GuestbookMessage[];
+  playlist: Track[];
+  photos: AlbumPhoto[];
   onGoGuestbook: () => void;
   onGoPhotos: () => void;
+  onGoSounds: () => void;
 }) {
-  const photoTiles = ALBUM.slice(0, 4);
+  const photoTiles = photos.slice(0, 4);
+  const latestTrack = playlist[0] ?? null;
 
   return (
     <div
@@ -108,31 +114,45 @@ export default function HomeTab({
           <div style={{ background: "linear-gradient(#7de3e3, #009a9a)", color: "#fff", fontSize: 11, fontWeight: 700, padding: "7px 12px" }}>
             ♪ ON REPEAT
           </div>
-          <div style={{ background: "#2b0a1e", padding: 14 }}>
-            <div style={{ fontFamily: "var(--font-vt323)", fontSize: 20, color: "#00ff9d" }}>▶ Fetch the Bolt Cutters</div>
-            <div style={{ fontFamily: "var(--font-vt323)", fontSize: 16, color: "#ff7ec2", marginTop: 2 }}>Fiona Apple — 4:32</div>
-            <div style={{ marginTop: 12, display: "flex", gap: 2, alignItems: "flex-end", height: 30 }}>
-              {BAR_HEIGHTS.map((h, i) => (
-                <div key={i} style={{ flex: 1, height: `${h}%`, background: BAR_COLORS[i % BAR_COLORS.length] }} />
-              ))}
-            </div>
-          </div>
-          <div style={{ background: "#faf2f5", padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ display: "flex", gap: 11, alignItems: "center" }}>
-              <div style={{ width: 36, height: 36, borderRadius: 8, background: "linear-gradient(135deg, #7de3e3, #009a9a)", flex: "none" }} />
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: "#7a0048" }}>Alvvays</div>
-                <div style={{ fontSize: 11, color: "#8a5875" }}>Blue Rev on loop</div>
+          {latestTrack ? (
+            <>
+              <div style={{ background: "#2b0a1e", padding: 14 }}>
+                <iframe
+                  style={{ borderRadius: 12, display: "block" }}
+                  src={`https://open.spotify.com/embed/track/${latestTrack.spotifyId}`}
+                  width="100%"
+                  height={152}
+                  frameBorder={0}
+                  allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                  loading="lazy"
+                  title={`Spotify Embed: ${latestTrack.title}`}
+                />
               </div>
-            </div>
-            <div style={{ display: "flex", gap: 11, alignItems: "center" }}>
-              <div style={{ width: 36, height: 36, borderRadius: 8, background: "linear-gradient(135deg, #ffe680, #ffb300)", flex: "none" }} />
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: "#7a0048" }}>Black Country, New Road</div>
-                <div style={{ fontSize: 11, color: "#8a5875" }}>Ants From Up There</div>
+              <div style={{ background: "#faf2f5", padding: 12, fontSize: 11, color: "#8a5875" }}>
+                Latest add — <span style={{ color: "var(--accent-dark)", fontWeight: 700 }}>{latestTrack.addedBy}</span>
               </div>
+            </>
+          ) : (
+            <div style={{ background: "#2b0a1e", padding: 24, textAlign: "center" }}>
+              <div style={{ fontFamily: "var(--font-vt323)", fontSize: 18, color: "#7de3e3" }}>nothing added yet</div>
+              <button
+                onClick={onGoSounds}
+                style={{
+                  marginTop: 12,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "#005c5c",
+                  background: "linear-gradient(#e3f4f4, #7de3e3)",
+                  border: "none",
+                  borderRadius: 999,
+                  padding: "9px 18px",
+                  cursor: "pointer",
+                }}
+              >
+                be the first to add a song
+              </button>
             </div>
-          </div>
+          )}
         </div>
 
         <div
@@ -143,13 +163,31 @@ export default function HomeTab({
             padding: "16px 18px",
           }}
         >
-          <div style={sectionLabel}>THE ALBUM</div>
+          <div style={sectionLabel}>ALBUM PHOTOS</div>
           <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            {photoTiles.map((p, i) => (
-              <div key={i} style={{ position: "relative", width: "100%", aspectRatio: "4/3", borderRadius: 8, overflow: "hidden" }}>
-                <PhotoSlot id={`album-${i}`} background={p.color} radius={8} placeholder="drop a photo" />
+            {photoTiles.length > 0 ? (
+              photoTiles.map((p) => (
+                <div key={p.id} style={{ position: "relative", width: "100%", aspectRatio: "4/3", borderRadius: 8, overflow: "hidden" }}>
+                  {/* Visitor-uploaded Blob URLs, not a next/image-optimizable local/remote-pattern asset. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={p.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                </div>
+              ))
+            ) : (
+              <div
+                style={{
+                  gridColumn: "1 / -1",
+                  padding: "18px 10px",
+                  textAlign: "center",
+                  fontSize: 11,
+                  color: "#8a5875",
+                  background: "#f7edf2",
+                  borderRadius: 8,
+                }}
+              >
+                no photos yet
               </div>
-            ))}
+            )}
           </div>
           <button
             onClick={onGoPhotos}

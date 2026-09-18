@@ -1,6 +1,6 @@
 import AudreySite from "@/components/AudreySite";
-import { getTracks, getGuestbookMessages } from "@/lib/db";
-import { toGuestbookMessage, type GuestbookMessage } from "@/lib/audrey-data";
+import { getTracks, getGuestbookMessages, getAlbumPhotos } from "@/lib/db";
+import { toGuestbookMessage, toAlbumPhoto, type GuestbookMessage, type AlbumPhoto } from "@/lib/audrey-data";
 
 export const dynamic = "force-dynamic";
 
@@ -20,5 +20,13 @@ export default async function Page() {
     console.error("Failed to load guestbook messages:", err);
   }
 
-  return <AudreySite initialTracks={tracks} initialMessages={messages} />;
+  let photos: AlbumPhoto[] = [];
+  try {
+    const rows = await getAlbumPhotos();
+    photos = rows.map(toAlbumPhoto);
+  } catch (err) {
+    console.error("Failed to load album photos:", err);
+  }
+
+  return <AudreySite initialTracks={tracks} initialMessages={messages} initialPhotos={photos} />;
 }

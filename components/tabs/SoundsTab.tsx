@@ -13,6 +13,8 @@ const inputStyle = {
   padding: "10px 14px",
   fontSize: 12,
   color: "#4a3341",
+  width: "100%",
+  boxSizing: "border-box" as const,
 };
 
 function SongSearch({
@@ -212,9 +214,7 @@ export default function SoundsTab({
         >
           THE BIRTHDAY MIX
         </h2>
-        <p style={{ margin: "8px 0 0", fontSize: 13, color: "#7f5f70" }}>
-          {playlist.length} songs, added by us. Put something on it.
-        </p>
+        <p style={{ margin: "8px 0 0", fontSize: 13, color: "#7f5f70" }}>Add a song here:</p>
         <div
           style={{
             marginTop: 20,

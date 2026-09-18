@@ -126,9 +126,6 @@ export default function GuestbookTab({
         }}
       >
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", color: "var(--accent-dark)" }}>YOUR MESSAGE</div>
-        <div style={{ fontSize: 11, lineHeight: 1.65, color: "#7f5f70" }}>
-          The prompt, if you want one: <em>the first time I met Audrey…</em>
-        </div>
         <input value={formName} onChange={(e) => onFormNameChange(e.target.value)} placeholder="your name" style={inputStyle} />
         <textarea
           value={formBody}
