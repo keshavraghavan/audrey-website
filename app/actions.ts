@@ -10,10 +10,12 @@ import { getAuthorizeUrl, refreshAccessToken, addTracksToPlaylist } from "@/lib/
 import { eq, sql } from "drizzle-orm";
 import { toGuestbookMessage, type GuestbookMessage } from "@/lib/audrey-data";
 
+const ALLOWED_BLOB_HOSTNAME = "9dg6oaslwkgdoppo.public.blob.vercel-storage.com";
+
 function isAllowedPhotoUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
-    return parsed.protocol === "https:" && parsed.hostname.endsWith(".public.blob.vercel-storage.com");
+    return parsed.protocol === "https:" && parsed.hostname === ALLOWED_BLOB_HOSTNAME;
   } catch {
     return false;
   }
