@@ -1,6 +1,8 @@
 // Server-only Spotify Web API helpers. Never import this from a Client
 // Component — it reads SPOTIFY_CLIENT_SECRET.
 
+import { readEnv } from "@/lib/env";
+
 export type SpotifySearchResult = {
   id: string;
   uri: string;
@@ -8,8 +10,6 @@ export type SpotifySearchResult = {
   artist: string;
   albumArtUrl: string | null;
 };
-
-let cachedAppToken: { accessToken: string; expiresAt: number } | null = null;
 
 /**
  * The deployment never got its Spotify env vars. Distinct from the errors
@@ -23,13 +23,17 @@ export class SpotifyNotConfiguredError extends Error {
   }
 }
 
-type SpotifyStep = "token" | "search" | "me" | "create-playlist" | "add-tracks";
+type SpotifyStep = "app-token" | "user-token" | "search" | "create-playlist" | "add-tracks";
 
 /**
- * Spotify answered and rejected us. `step` matters for diagnosis: a failure at
- * "token" means our client credentials were refused, while the same status at
- * "search" means the credentials were fine and Spotify refused the call —
- * completely different fixes.
+ * Spotify answered and rejected us. `step` matters for diagnosis:
+ * - "app-token": the client-credentials grant. A 400/401 here means our client
+ *   ID/secret were refused; anything else is Spotify's accounts service having
+ *   a bad moment.
+ * - "user-token": exchanging an OAuth code or refreshing the owner's token. A
+ *   400 here is usually `invalid_grant` — the owner revoked access or the code
+ *   expired — not a bad secret.
+ * - everything else: the token was accepted and Spotify refused the call itself.
  */
 export class SpotifyRequestError extends Error {
   constructor(
@@ -40,6 +44,11 @@ export class SpotifyRequestError extends Error {
     super(`Spotify ${step} failed: ${status}${detail ? ` — ${detail}` : ""}`);
     this.name = "SpotifyRequestError";
   }
+}
+
+/** Spotify refused our client credentials (wrong or rotated secret). */
+export function isCredentialRejection(err: unknown): boolean {
+  return err instanceof SpotifyRequestError && err.step === "app-token" && (err.status === 400 || err.status === 401);
 }
 
 // Spotify puts the actual reason in the response body — `invalid_client` for a
@@ -55,11 +64,8 @@ async function requestError(step: SpotifyStep, res: Response): Promise<SpotifyRe
 }
 
 function requireClientCredentials(): { clientId: string; clientSecret: string } {
-  // Trimmed because these get pasted by hand into a hosting dashboard, where a
-  // trailing newline rides along and comes back as an `invalid_client`
-  // rejection that looks nothing like a whitespace problem.
-  const clientId = process.env.SPOTIFY_CLIENT_ID?.trim();
-  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET?.trim();
+  const clientId = readEnv("SPOTIFY_CLIENT_ID");
+  const clientSecret = readEnv("SPOTIFY_CLIENT_SECRET");
   if (!clientId || !clientSecret) {
     throw new SpotifyNotConfiguredError("SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET are not set");
   }
@@ -67,17 +73,18 @@ function requireClientCredentials(): { clientId: string; clientSecret: string } 
 }
 
 function requireRedirectUri(): string {
-  const redirectUri = process.env.SPOTIFY_REDIRECT_URI?.trim();
+  const redirectUri = readEnv("SPOTIFY_REDIRECT_URI");
   if (!redirectUri) {
     throw new SpotifyNotConfiguredError("SPOTIFY_REDIRECT_URI is not set");
   }
   return redirectUri;
 }
 
-async function getAppAccessToken(): Promise<string> {
-  if (cachedAppToken && cachedAppToken.expiresAt > Date.now()) {
-    return cachedAppToken.accessToken;
-  }
+type TokenResponse = { access_token: string; expires_in: number; refresh_token?: string };
+
+// Every grant goes through the same endpoint with the same Basic auth; only the
+// form params and which step to blame differ.
+async function postToken(step: "app-token" | "user-token", params: Record<string, string>): Promise<TokenResponse> {
   const { clientId, clientSecret } = requireClientCredentials();
   const res = await fetch("https://accounts.spotify.com/api/token", {
     method: "POST",
@@ -85,18 +92,46 @@ async function getAppAccessToken(): Promise<string> {
       "Content-Type": "application/x-www-form-urlencoded",
       Authorization: "Basic " + Buffer.from(`${clientId}:${clientSecret}`).toString("base64"),
     },
-    body: "grant_type=client_credentials",
+    body: new URLSearchParams(params).toString(),
   });
   if (!res.ok) {
-    throw await requestError("token", res);
+    throw await requestError(step, res);
   }
-  const data = (await res.json()) as { access_token: string; expires_in: number };
-  cachedAppToken = {
-    accessToken: data.access_token,
-    // Refresh a minute early so a search never races an expiring token.
-    expiresAt: Date.now() + (data.expires_in - 60) * 1000,
-  };
-  return cachedAppToken.accessToken;
+  return (await res.json()) as TokenResponse;
+}
+
+type AppToken = { accessToken: string; expiresAt: number };
+
+let cachedAppToken: AppToken | null = null;
+// Shared so concurrent searches on a warm instance wait on one token request
+// instead of each fetching (and overwriting) their own.
+let pendingAppToken: Promise<AppToken> | null = null;
+
+async function getAppAccessToken(): Promise<{ accessToken: string; fresh: boolean }> {
+  if (cachedAppToken && cachedAppToken.expiresAt > Date.now()) {
+    return { accessToken: cachedAppToken.accessToken, fresh: false };
+  }
+  pendingAppToken ??= postToken("app-token", { grant_type: "client_credentials" })
+    .then((data) => {
+      cachedAppToken = {
+        accessToken: data.access_token,
+        // Refresh a minute early so a search never races an expiring token.
+        expiresAt: Date.now() + (data.expires_in - 60) * 1000,
+      };
+      return cachedAppToken;
+    })
+    .finally(() => {
+      pendingAppToken = null;
+    });
+  return { accessToken: (await pendingAppToken).accessToken, fresh: true };
+}
+
+// Only drop the cache if it still holds the token that was rejected — another
+// request may already have replaced it with a good one.
+function invalidateAppToken(rejected: string): void {
+  if (cachedAppToken?.accessToken === rejected) {
+    cachedAppToken = null;
+  }
 }
 
 type SpotifyApiTrack = {
@@ -125,13 +160,17 @@ export async function searchTracks(query: string): Promise<SpotifySearchResult[]
   url.searchParams.set("type", "track");
   url.searchParams.set("limit", "8");
 
-  let res = await fetch(url, { headers: { Authorization: `Bearer ${await getAppAccessToken()}` } });
-  if (res.status === 401) {
+  const token = await getAppAccessToken();
+  let res = await fetch(url, { headers: { Authorization: `Bearer ${token.accessToken}` } });
+  if (res.status === 401 && !token.fresh) {
     // The cached token outlived its real lifetime — a serverless instance can
     // stay warm across a Spotify-side invalidation. Drop it and try once with
     // a fresh one rather than failing a search the visitor can't retry into.
-    cachedAppToken = null;
-    res = await fetch(url, { headers: { Authorization: `Bearer ${await getAppAccessToken()}` } });
+    // A token we fetched moments ago getting a 401 won't be fixed by another.
+    await res.body?.cancel();
+    invalidateAppToken(token.accessToken);
+    const retry = await getAppAccessToken();
+    res = await fetch(url, { headers: { Authorization: `Bearer ${retry.accessToken}` } });
   }
   if (!res.ok) {
     throw await requestError("search", res);
@@ -146,11 +185,6 @@ export type SpotifyUserTokens = {
   expiresIn: number;
 };
 
-function basicAuthHeader(): string {
-  const { clientId, clientSecret } = requireClientCredentials();
-  return "Basic " + Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
-}
-
 export function getAuthorizeUrl(state: string): string {
   const { clientId } = requireClientCredentials();
   const redirectUri = requireRedirectUri();
@@ -164,42 +198,16 @@ export function getAuthorizeUrl(state: string): string {
 }
 
 export async function exchangeCodeForTokens(code: string): Promise<SpotifyUserTokens> {
-  const redirectUri = requireRedirectUri();
-  const res = await fetch("https://accounts.spotify.com/api/token", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Authorization: basicAuthHeader(),
-    },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      code,
-      redirect_uri: redirectUri,
-    }).toString(),
+  const data = await postToken("user-token", {
+    grant_type: "authorization_code",
+    code,
+    redirect_uri: requireRedirectUri(),
   });
-  if (!res.ok) {
-    throw await requestError("token", res);
-  }
-  const data = (await res.json()) as { access_token: string; refresh_token: string; expires_in: number };
-  return { accessToken: data.access_token, refreshToken: data.refresh_token, expiresIn: data.expires_in };
+  return { accessToken: data.access_token, refreshToken: data.refresh_token!, expiresIn: data.expires_in };
 }
 
 export async function refreshAccessToken(refreshToken: string): Promise<{ accessToken: string; expiresIn: number; refreshToken?: string }> {
-  const res = await fetch("https://accounts.spotify.com/api/token", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Authorization: basicAuthHeader(),
-    },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: refreshToken,
-    }).toString(),
-  });
-  if (!res.ok) {
-    throw await requestError("token", res);
-  }
-  const data = (await res.json()) as { access_token: string; expires_in: number; refresh_token?: string };
+  const data = await postToken("user-token", { grant_type: "refresh_token", refresh_token: refreshToken });
   return {
     accessToken: data.access_token,
     expiresIn: data.expires_in,
@@ -207,19 +215,12 @@ export async function refreshAccessToken(refreshToken: string): Promise<{ access
   };
 }
 
-export async function getSpotifyUserId(accessToken: string): Promise<string> {
-  const res = await fetch("https://api.spotify.com/v1/me", {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (!res.ok) {
-    throw await requestError("me", res);
-  }
-  const data = (await res.json()) as { id: string };
-  return data.id;
-}
-
-export async function createPlaylist(accessToken: string, userId: string, name: string): Promise<string> {
-  const res = await fetch(`https://api.spotify.com/v1/users/${encodeURIComponent(userId)}/playlists`, {
+// Spotify's February 2026 Web API changes removed POST /users/{id}/playlists
+// and renamed /playlists/{id}/tracks to /items; the old paths return 403 for
+// every app. Don't switch back to them when chasing a 403 — check the owner is
+// on the app's user allowlist instead.
+export async function createPlaylist(accessToken: string, name: string): Promise<string> {
+  const res = await fetch("https://api.spotify.com/v1/me/playlists", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -234,19 +235,22 @@ export async function createPlaylist(accessToken: string, userId: string, name: 
   return data.id;
 }
 
+/** Spotify's cap on URIs per add-items request. */
+export const PLAYLIST_ADD_LIMIT = 100;
+
 export async function addTracksToPlaylist(accessToken: string, playlistId: string, uris: string[]): Promise<void> {
-  for (let i = 0; i < uris.length; i += 100) {
-    const chunk = uris.slice(i, i + 100);
-    const res = await fetch(`https://api.spotify.com/v1/playlists/${encodeURIComponent(playlistId)}/tracks`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ uris: chunk }),
-    });
-    if (!res.ok) {
-      throw await requestError("add-tracks", res);
-    }
+  if (uris.length > PLAYLIST_ADD_LIMIT) {
+    throw new Error(`addTracksToPlaylist takes at most ${PLAYLIST_ADD_LIMIT} URIs; chunk them first`);
+  }
+  const res = await fetch(`https://api.spotify.com/v1/playlists/${encodeURIComponent(playlistId)}/items`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ uris }),
+  });
+  if (!res.ok) {
+    throw await requestError("add-tracks", res);
   }
 }
