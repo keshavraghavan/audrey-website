@@ -6,7 +6,8 @@ import { tracks, spotifyConnection, guestbookMessages, albumPhotos } from "@/lib
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { randomBytes, timingSafeEqual } from "node:crypto";
-import { getAuthorizeUrl, refreshAccessToken, addTracksToPlaylist } from "@/lib/spotify";
+import { getAuthorizeUrl, refreshAccessToken, addTracksToPlaylist, SpotifyNotConfiguredError } from "@/lib/spotify";
+import { readEnv } from "@/lib/env";
 import { eq, sql } from "drizzle-orm";
 import { toGuestbookMessage, toAlbumPhoto, type GuestbookMessage, type AlbumPhoto } from "@/lib/audrey-data";
 
@@ -33,6 +34,45 @@ export type AddTrackInput = {
 export type AddTrackResult =
   | { ok: true; duplicate?: boolean; playlistSyncFailed?: boolean }
   | { ok: false; error: string };
+
+// Pushes one saved track to the live playlist. Returns false only when the
+// track didn't reach Spotify. Non-blocking either way — the track is already
+// saved, and syncedAt staying null means the next connect backfills it. But
+// never silent: swallowing this entirely is how a broken playlist endpoint
+// went unnoticed.
+async function syncTrackToPlaylist(trackId: string, spotifyUri: string): Promise<boolean> {
+  let accessToken: string;
+  let playlistId: string;
+  try {
+    const connection = await getSpotifyConnection();
+    if (!connection?.playlistId) return true; // not connected yet — nothing to sync
+    playlistId = connection.playlistId;
+    const refreshed = await refreshAccessToken(connection.refreshToken);
+    accessToken = refreshed.accessToken;
+    if (refreshed.refreshToken) {
+      // Spotify invalidates the old refresh token when it rotates one, so save
+      // it before anything else can fail and throw it away.
+      await getDb()
+        .update(spotifyConnection)
+        .set({ refreshToken: refreshed.refreshToken })
+        .where(eq(spotifyConnection.id, connection.id));
+    }
+    await addTracksToPlaylist(accessToken, playlistId, [spotifyUri]);
+  } catch (err) {
+    console.error("Live sync to Spotify playlist failed:", err);
+    return false;
+  }
+
+  try {
+    await getDb().update(tracks).set({ syncedAt: new Date() }).where(eq(tracks.id, trackId));
+  } catch (err) {
+    // The song is on the playlist; only the bookkeeping failed. The visitor
+    // shouldn't be told otherwise. The next reconnect will add it a second
+    // time — rare, and harmless next to a false failure notice.
+    console.error("Track pushed to Spotify but marking it synced failed:", err);
+  }
+  return true;
+}
 
 export async function addTrackToMix(input: AddTrackInput): Promise<AddTrackResult> {
   const addedBy = input.addedBy.trim();
@@ -61,25 +101,7 @@ export async function addTrackToMix(input: AddTrackInput): Promise<AddTrackResul
       return { ok: true, duplicate: true };
     }
 
-    let playlistSyncFailed = false;
-    try {
-      const connection = await getSpotifyConnection();
-      if (connection?.playlistId) {
-        const { accessToken, refreshToken } = await refreshAccessToken(connection.refreshToken);
-        await addTracksToPlaylist(accessToken, connection.playlistId, [input.spotifyUri]);
-        if (refreshToken) {
-          await getDb().update(spotifyConnection).set({ refreshToken }).where(eq(spotifyConnection.id, connection.id));
-        }
-        await getDb().update(tracks).set({ syncedAt: new Date() }).where(eq(tracks.id, inserted[0].id));
-      }
-    } catch (err) {
-      // Still non-blocking — the track is safely saved either way (revoked
-      // token, Spotify outage, Neon connection error). But no longer silent:
-      // swallowing this entirely is how a broken playlist endpoint went
-      // unnoticed. syncedAt stays null, so the next connect backfills it.
-      console.error("Live sync to Spotify playlist failed:", err);
-      playlistSyncFailed = true;
-    }
+    const playlistSyncFailed = !(await syncTrackToPlaylist(inserted[0].id, input.spotifyUri));
 
     revalidatePath("/");
     return playlistSyncFailed ? { ok: true, playlistSyncFailed: true } : { ok: true };
@@ -92,7 +114,7 @@ export async function addTrackToMix(input: AddTrackInput): Promise<AddTrackResul
 const STATE_COOKIE = "spotify_oauth_state";
 
 function passphraseMatches(input: string): boolean {
-  const expected = process.env.CONNECT_PASSPHRASE;
+  const expected = readEnv("CONNECT_PASSPHRASE");
   if (!expected || expected.length < 8) return false; // fail closed when unconfigured
   const a = Buffer.from(input, "utf8");
   const b = Buffer.from(expected, "utf8");
@@ -105,6 +127,16 @@ export async function connectSpotify(passphrase: string): Promise<{ ok: false; e
     return { ok: false, error: "That's not the right passphrase." };
   }
   const state = randomBytes(16).toString("hex");
+  let authorizeUrl: string;
+  try {
+    authorizeUrl = getAuthorizeUrl(state);
+  } catch (err) {
+    if (err instanceof SpotifyNotConfiguredError) {
+      console.error("connectSpotify:", err);
+      return { ok: false, error: "Spotify isn't configured on this deployment yet — add its env vars and redeploy." };
+    }
+    throw err;
+  }
   const cookieStore = await cookies();
   cookieStore.set(STATE_COOKIE, state, {
     httpOnly: true,
@@ -113,7 +145,7 @@ export async function connectSpotify(passphrase: string): Promise<{ ok: false; e
     maxAge: 600,
     path: "/",
   });
-  redirect(getAuthorizeUrl(state));
+  redirect(authorizeUrl);
 }
 
 export type PostGuestbookMessageInput = {

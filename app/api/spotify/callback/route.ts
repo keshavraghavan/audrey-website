@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { eq, isNull } from "drizzle-orm";
+import { eq, inArray, isNull } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { tracks, spotifyConnection } from "@/lib/db/schema";
-import { exchangeCodeForTokens, getSpotifyUserId, createPlaylist, addTracksToPlaylist } from "@/lib/spotify";
+import {
+  exchangeCodeForTokens,
+  createPlaylist,
+  addTracksToPlaylist,
+  PLAYLIST_ADD_LIMIT,
+  SpotifyNotConfiguredError,
+} from "@/lib/spotify";
 import { NAME } from "@/lib/audrey-data";
 
 const STATE_COOKIE = "spotify_oauth_state";
@@ -21,16 +27,13 @@ export async function GET(request: NextRequest) {
 
   try {
     const tokens = await exchangeCodeForTokens(code);
-    // Doubles as a check that the account is registered for this app and the
-    // token is valid, before we start writing anything.
-    const userId = await getSpotifyUserId(tokens.accessToken);
 
     const db = getDb();
     const existing = (await db.select().from(spotifyConnection).limit(1))[0];
 
     let playlistId = existing?.playlistId ?? null;
     if (!playlistId) {
-      playlistId = await createPlaylist(tokens.accessToken, userId, `${NAME}'s Birthday Mix`);
+      playlistId = await createPlaylist(tokens.accessToken, `${NAME}'s Birthday Mix`);
     }
 
     if (existing) {
@@ -42,21 +45,30 @@ export async function GET(request: NextRequest) {
       await db.insert(spotifyConnection).values({ refreshToken: tokens.refreshToken, playlistId });
     }
 
+    // Mark each chunk synced as soon as Spotify accepts it, so a failure
+    // partway through only leaves the unpushed chunks for the next reconnect
+    // instead of re-adding (and duplicating) everything already on the playlist.
     const unsynced = await db.select().from(tracks).where(isNull(tracks.syncedAt));
-    if (unsynced.length > 0) {
+    for (let i = 0; i < unsynced.length; i += PLAYLIST_ADD_LIMIT) {
+      const chunk = unsynced.slice(i, i + PLAYLIST_ADD_LIMIT);
       await addTracksToPlaylist(
         tokens.accessToken,
         playlistId,
-        unsynced.map((t) => t.spotifyUri),
+        chunk.map((t) => t.spotifyUri),
       );
-      for (const t of unsynced) {
-        await db.update(tracks).set({ syncedAt: new Date() }).where(eq(tracks.id, t.id));
-      }
+      await db
+        .update(tracks)
+        .set({ syncedAt: new Date() })
+        .where(inArray(tracks.id, chunk.map((t) => t.id)));
     }
 
     return NextResponse.redirect(new URL(`/connect-spotify?status=connected&count=${unsynced.length}`, request.url));
   } catch (err) {
     console.error("Spotify callback failed:", err);
+    if (err instanceof SpotifyNotConfiguredError) {
+      // Retrying won't help — the deployment needs its env vars and a redeploy.
+      return NextResponse.json({ error: "Spotify isn't configured on this deployment" }, { status: 503 });
+    }
     return NextResponse.json({ error: "connect failed — try again" }, { status: 500 });
   }
 }

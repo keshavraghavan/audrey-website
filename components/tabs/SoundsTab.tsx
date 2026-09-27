@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import type { Track } from "@/lib/audrey-data";
 import type { SpotifySearchResult } from "@/lib/spotify";
+import { isPermanentSearchError, type SearchErrorBody } from "@/lib/spotify-search-errors";
 
 const inputStyle = {
   border: "none",
@@ -19,7 +20,8 @@ const inputStyle = {
 
 // Carries the route's error code so the notice can tell a problem that will
 // clear on its own apart from one that won't. `permanent` failures are config
-// problems on our side — telling a visitor to try again just wastes their time.
+// problems on our side or Spotify refusing us outright — telling a visitor to
+// try again just wastes their time.
 class SearchFailure extends Error {
   constructor(readonly permanent: boolean) {
     super("search failed");
@@ -30,8 +32,12 @@ class SearchFailure extends Error {
 async function runSearch(query: string, signal: AbortSignal): Promise<SpotifySearchResult[]> {
   const res = await fetch(`/api/spotify/search?q=${encodeURIComponent(query)}`, { signal });
   if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as { error?: string } | null;
-    throw new SearchFailure(body?.error === "not_configured" || body?.error === "spotify_auth_rejected");
+    const body = (await res.json().catch((err: unknown) => {
+      // An abort mid-read must still reach the caller as an abort, not a failure.
+      if (signal.aborted) throw err;
+      return null;
+    })) as Partial<SearchErrorBody> | null;
+    throw new SearchFailure(isPermanentSearchError(body));
   }
   return (await res.json()) as SpotifySearchResult[];
 }
@@ -48,7 +54,6 @@ function SongSearch({
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SpotifySearchResult[]>([]);
   const [searchError, setSearchError] = useState("");
-  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (query.trim().length < 2) {
@@ -58,26 +63,30 @@ function SongSearch({
       /* eslint-enable react-hooks/set-state-in-effect */
       return;
     }
+    // Aborted on cleanup, so a slow response for an old query can never land
+    // after the input has moved on (or been cleared by picking a track).
+    const controller = new AbortController();
     const timer = setTimeout(() => {
-      abortRef.current?.abort();
-      const controller = new AbortController();
-      abortRef.current = controller;
       runSearch(query, controller.signal)
         .then((data) => {
+          if (controller.signal.aborted) return;
           setResults(data);
           setSearchError("");
         })
         .catch((err: unknown) => {
-          if (err instanceof DOMException && err.name === "AbortError") return;
+          if (controller.signal.aborted) return;
           setResults([]);
           setSearchError(
             err instanceof SearchFailure && err.permanent
-              ? "Song search isn't set up right now — everything else on the site still works."
+              ? "Song search isn't available right now — everything else on the site still works."
               : "Couldn't search right now — try again in a moment.",
           );
         });
     }, 300);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [query]);
 
   if (selectedTrack) {

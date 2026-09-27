@@ -56,8 +56,8 @@ the browser's network tab:
 | Status | `error` | Means |
 | --- | --- | --- |
 | 503 | `not_configured` | `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` are missing or blank in this deployment. |
-| 502 | `spotify_auth_rejected` | Spotify refused our client credentials — wrong, rotated, or whitespace picked up when pasting. |
-| 502 | `spotify_error` | Credentials were accepted; Spotify refused the search itself. `status` carries its status code. |
+| 502 | `spotify_auth_rejected` | Spotify refused our client credentials (400/401 from the token endpoint) — the secret is wrong or was rotated. Whitespace is trimmed, so it isn't that. |
+| 502 | `spotify_error` | Spotify returned an error, either at the token endpoint (outage, rate limit) or on the search itself. `status` carries its status code; 5xx and 429 clear on their own, other 4xx don't. |
 | 500 | `search_failed` | Couldn't reach Spotify at all. |
 
 The server log for the same request carries Spotify's own response body, which
